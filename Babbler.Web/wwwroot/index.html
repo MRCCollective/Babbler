@@ -1276,12 +1276,13 @@
                     return;
                 }
 
-                if (!data.translatedText) {
+                const liveText = data.translatedText || data.sourceText;
+                if (!liveText) {
                     return;
                 }
 
                 const marker = data.isFinal ? "final" : "partial";
-                addLine(`[${marker}] ${data.translatedText}`);
+                addLine(`[${marker}] ${liveText}`);
             });
 
             nextConnection.onreconnecting(() => {

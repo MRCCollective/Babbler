@@ -178,11 +178,12 @@
                 return;
             }
 
-            if (!data.translatedText) {
+            const liveText = data.translatedText || data.sourceText;
+            if (!liveText) {
                 return;
             }
 
-            showSubtitle(data.translatedText);
+            showSubtitle(liveText);
             if (data.targetLanguage) {
                 langsEl.textContent = `Room: ${roomId} | Target: ${data.targetLanguage}`;
                 if (targetLanguageEl.value !== data.targetLanguage) {
