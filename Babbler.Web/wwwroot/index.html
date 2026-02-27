@@ -246,6 +246,18 @@
             line-height: 1.45;
         }
 
+        #debugLog {
+            height: 220px;
+            overflow: auto;
+            background: #020912;
+            border-radius: 10px;
+            padding: 0.8rem;
+            font-family: Consolas, monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            border: 1px solid rgba(238, 244, 251, 0.14);
+        }
+
         .line {
             margin: 0.28rem 0;
             color: #d6e5f5;
@@ -253,6 +265,18 @@
 
         .line.system {
             color: #ffd2a7;
+        }
+
+        .line.debug {
+            color: #a6d8ff;
+        }
+
+        .line.debug.warn {
+            color: #ffd87a;
+        }
+
+        .line.debug.error {
+            color: #ffb8bf;
         }
 
         .rooms-head {
@@ -467,6 +491,14 @@
             <h2>Live Feed</h2>
             <div id="log"></div>
         </section>
+
+        <section class="panel">
+            <div class="rooms-head">
+                <h2>Debug Output</h2>
+                <button id="clearDebugBtn" class="small-btn" type="button">Clear</button>
+            </div>
+            <div id="debugLog"></div>
+        </section>
     </main>
 
     <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
@@ -475,6 +507,8 @@
         const statusEl = document.getElementById("status");
         const usageEl = document.getElementById("usage");
         const logEl = document.getElementById("log");
+        const debugLogEl = document.getElementById("debugLog");
+        const clearDebugBtn = document.getElementById("clearDebugBtn");
         const roomIdEl = document.getElementById("roomId");
         const newRoomBtn = document.getElementById("newRoomBtn");
         const sourceLanguageEl = document.getElementById("sourceLanguage");
@@ -528,6 +562,12 @@
         let sourceLanguageAutoFallbackUsed = false;
         let lastRoomDiagStateSignature = "";
         let lastRoomDiagWarningAt = 0;
+        let publishAttemptCount = 0;
+        let publishSuccessCount = 0;
+        let publishFailureCount = 0;
+        let lastDebugRecognizingAt = 0;
+        let lastPublishDebugAt = 0;
+        let lastRoomDiagDebugAt = 0;
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -584,6 +624,11 @@
             }
         });
 
+        clearDebugBtn.addEventListener("click", () => {
+            debugLogEl.replaceChildren();
+            addDebugLine("debug log cleared");
+        });
+
         micInputEl.addEventListener("change", async () => {
             const requestedMicDeviceId = getSelectedMicDeviceId();
 
@@ -605,6 +650,7 @@
                 selectedMicDeviceId = getSelectedMicDeviceId();
                 const selectedLabel = getSelectedMicLabel();
                 addLine(`[system] Mic input selected: ${selectedLabel}`, true);
+                addDebugLine(`mic selected label="${selectedLabel}" deviceId="${selectedMicDeviceId || "default"}"`);
 
                 if (browserRecognizer && browserRecognizerRoomId) {
                     addLine("[system] Applying microphone change...", true);
@@ -637,6 +683,7 @@
 
             if (document.hidden) {
                 addLine("[system] Control tab is in background. Keep this tab active while capturing microphone.", true);
+                addDebugLine("visibility change: hidden while recognizer active", "warn");
             }
         });
 
@@ -684,6 +731,20 @@
             line.className = isSystem ? "line system" : "line";
             line.textContent = text;
             logEl.prepend(line);
+        }
+
+        function addDebugLine(text, level = "info") {
+            const line = document.createElement("p");
+            line.className = `line debug${level === "info" ? "" : ` ${level}`}`;
+            const timestamp = new Date().toLocaleTimeString();
+            line.textContent = `[${timestamp}] ${text}`;
+            debugLogEl.appendChild(line);
+
+            while (debugLogEl.childElementCount > 500) {
+                debugLogEl.removeChild(debugLogEl.firstChild);
+            }
+
+            debugLogEl.scrollTop = debugLogEl.scrollHeight;
         }
 
         function updateStatus(state) {
@@ -993,12 +1054,14 @@
 
         async function ensureMicrophonePermission() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                addDebugLine("getUserMedia unavailable in this browser", "warn");
                 return;
             }
 
             let stream = null;
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                addDebugLine("microphone permission confirmed");
             } finally {
                 if (stream) {
                     for (const track of stream.getTracks()) {
@@ -1029,6 +1092,10 @@
                 if (event?.result?.text) {
                     lastMicActivityAt = Date.now();
                     noteMicSpeechActivity(false);
+                    if (Date.now() - lastDebugRecognizingAt > 3000) {
+                        lastDebugRecognizingAt = Date.now();
+                        addDebugLine(`recognizing partial chars=${event.result.text.length}`);
+                    }
                 }
                 publishRecognitionResult(sourceLanguage, false, event?.result);
             };
@@ -1038,12 +1105,18 @@
                     lastMicActivityAt = Date.now();
                     noteMicSpeechActivity(true);
                     addLine(`[mic-final] ${event.result.text}`);
+                    addDebugLine(`recognized final chars=${event.result.text.length}`);
                 }
                 publishRecognitionResult(sourceLanguage, true, event?.result);
             };
 
+            recognizer.sessionStarted = () => {
+                addDebugLine(`speech session started room=${roomId} source=${sourceLanguage}`);
+            };
+
             recognizer.sessionStopped = () => {
                 addLine("[system] Speech session stopped.", true);
+                addDebugLine("speech session stopped", "warn");
 
                 if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
                     return;
@@ -1069,6 +1142,7 @@
             recognizer.canceled = (_, event) => {
                 const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
                 addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
+                addDebugLine(`speech canceled reason=${event?.reason || "unknown"} details=${event?.errorDetails || "-"}`, "error");
 
                 if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
                     return;
@@ -1136,6 +1210,8 @@
             }
 
             const selectedDeviceId = getSelectedMicDeviceId();
+            addDebugLine(
+                `start recognizer room=${roomId} source=${sourceLanguage} device=${selectedDeviceId || "default"} visible=${!document.hidden}`);
             let recognizer = buildTranslationRecognizer(
                 speechConfig,
                 createSpeechAudioConfig(selectedDeviceId),
@@ -1192,6 +1268,7 @@
             }
             addLine("[system] Mic activity animation enabled during active translation.", true);
             addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
+            addDebugLine(`recognizer active source=${sourceLanguage} mic="${activeDeviceLabel}"`);
         }
 
         async function stopBrowserRecognition(restartMeter = true) {
@@ -1211,6 +1288,7 @@
             browserRecognizerRoomId = "";
             currentRecognitionDeviceId = "";
             currentRecognitionLanguage = "";
+            addDebugLine("stopping recognizer");
             stopMicWatchdog();
             stopMicActivityAnimation();
             stopMicLevelMeter();
@@ -1245,6 +1323,7 @@
 
                 lastMicWarningAt = now;
                 addLine("[error] No speech detected from microphone yet. Check browser mic input device and site permission.", true);
+                addDebugLine("watchdog: no speech recognized for >15s", "warn");
 
                 if (!sourceLanguageAutoFallbackUsed &&
                     now - lastMicActivityAt >= 20000 &&
@@ -1472,17 +1551,33 @@
                 return;
             }
 
+            publishAttemptCount += 1;
+            if (isFinal || Date.now() - lastPublishDebugAt > 5000) {
+                lastPublishDebugAt = Date.now();
+                addDebugLine(
+                    `publish attempt#${publishAttemptCount} final=${isFinal} sourceChars=${sourceText.length} keys=${Object.keys(translations).join(",") || "-"}`);
+            }
+
             connection.invoke("PublishClientTranslation", {
                 sourceText,
                 sourceLanguage,
                 isFinal,
                 translations
+            }).then(() => {
+                publishSuccessCount += 1;
+                if (isFinal) {
+                    addDebugLine(`publish success final total=${publishSuccessCount}/${publishAttemptCount}`);
+                }
             }).catch(err => {
+                publishFailureCount += 1;
                 // Keep translating even on transient publish failures.
                 if (Date.now() - lastPublishErrorAt > 5000) {
                     lastPublishErrorAt = Date.now();
                     addLine(`[error] Live publish failed: ${err?.message || err}`, true);
                 }
+                addDebugLine(
+                    `publish failed totalFailures=${publishFailureCount} msg=${err?.message || err}`,
+                    "error");
             });
         }
 
@@ -1502,8 +1597,10 @@
                 body: JSON.stringify(payload)
             });
             if (!response.ok) {
+                addDebugLine(`room start failed room=${roomId} msg=${response.errorMessage}`, "error");
                 throw new Error(response.errorMessage);
             }
+            addDebugLine(`room start ok room=${roomId} source=${payload.sourceLanguage}`);
 
             if (roomId === currentRoomId) {
                 updateStatus(response.data);
@@ -1536,8 +1633,10 @@
                 method: "POST"
             });
             if (!response.ok) {
+                addDebugLine(`room stop failed room=${roomId} reason=${reason} msg=${response.errorMessage}`, "error");
                 throw new Error(response.errorMessage);
             }
+            addDebugLine(`room stop ok room=${roomId} reason=${reason}`);
 
             if (roomId === currentRoomId) {
                 updateStatus(response.data);
@@ -1596,6 +1695,7 @@
             });
 
             await nextConnection.start();
+            addDebugLine(`signalr connected room=${roomId} transport=LongPolling state=${nextConnection.state}`);
             connection = nextConnection;
         }
 
@@ -1708,6 +1808,11 @@
             const publishAgeMs = diag.lastClientPublishAtUtc
                 ? Date.now() - Date.parse(diag.lastClientPublishAtUtc)
                 : null;
+            if (Date.now() - lastRoomDiagDebugAt > 10000) {
+                lastRoomDiagDebugAt = Date.now();
+                addDebugLine(
+                    `roomdiag running=${diag.isRunning} hubClients=${diag.activeHubConnections ?? 0} lastPublish=${diag.lastClientPublishAtUtc || "none"} stopReason=${diag.lastStopReason || "-"}`);
+            }
 
             const signature = [
                 diag.isRunning ? "running" : "stopped",
@@ -1816,10 +1921,23 @@
         }
 
         async function init() {
+            addDebugLine(`init secure=${window.isSecureContext} hidden=${document.hidden} online=${navigator.onLine}`);
+            addDebugLine(`ua=${navigator.userAgent}`);
+            if (navigator.permissions?.query) {
+                try {
+                    const micPermission = await navigator.permissions.query({ name: "microphone" });
+                    addDebugLine(`permission microphone=${micPermission.state}`);
+                } catch {
+                    addDebugLine("permission microphone query unavailable", "warn");
+                }
+            }
+
             try {
                 await refreshMicrophoneDevices(true);
+                addDebugLine(`mic devices loaded selected="${getSelectedMicLabel()}" id="${getSelectedMicDeviceId() || "default"}"`);
             } catch (err) {
                 addLine(`[error] Mic device list unavailable: ${err?.message || err}`, true);
+                addDebugLine(`mic device load failed: ${err?.message || err}`, "error");
             }
             await ensureRoom();
             await refreshRoomsSafe();
