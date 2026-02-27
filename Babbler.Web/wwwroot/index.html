@@ -562,6 +562,8 @@
         let sourceLanguageAutoFallbackUsed = false;
         let lastRoomDiagStateSignature = "";
         let lastRoomDiagWarningAt = 0;
+        let startRoomInProgress = false;
+        let recognizerActionQueue = Promise.resolve();
         let publishAttemptCount = 0;
         let publishSuccessCount = 0;
         let publishFailureCount = 0;
@@ -1118,7 +1120,7 @@
                 addLine("[system] Speech session stopped.", true);
                 addDebugLine("speech session stopped", "warn");
 
-                if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
+                if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
                     return;
                 }
 
@@ -1144,7 +1146,7 @@
                 addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
                 addDebugLine(`speech canceled reason=${event?.reason || "unknown"} details=${event?.errorDetails || "-"}`, "error");
 
-                if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
+                if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
                     return;
                 }
 
@@ -1174,6 +1176,23 @@
             });
         }
 
+        function queueRecognizerAction(actionName, action) {
+            const run = async () => {
+                addDebugLine(`recognizer action begin: ${actionName}`);
+                try {
+                    return await action();
+                } finally {
+                    addDebugLine(`recognizer action end: ${actionName}`);
+                }
+            };
+
+            const next = recognizerActionQueue.then(run, run);
+            recognizerActionQueue = next.catch(() => {
+                // Keep the queue alive after failures.
+            });
+            return next;
+        }
+
         function getSourceLanguageFallback(sourceLanguage) {
             if (sourceLanguage === "en-US") {
                 return "sv-SE";
@@ -1187,12 +1206,18 @@
         }
 
         async function startBrowserRecognition(roomId, sourceLanguage) {
+            return queueRecognizerAction(
+                `start room=${roomId} source=${sourceLanguage}`,
+                async () => await startBrowserRecognitionCore(roomId, sourceLanguage));
+        }
+
+        async function startBrowserRecognitionCore(roomId, sourceLanguage) {
             if (!connection) {
                 throw new Error("SignalR connection is not ready.");
             }
 
             if (browserRecognizer) {
-                await stopBrowserRecognition(false);
+                await stopBrowserRecognitionCore(false);
             }
             stopMicLevelMeter();
 
@@ -1272,6 +1297,12 @@
         }
 
         async function stopBrowserRecognition(restartMeter = true) {
+            return queueRecognizerAction(
+                `stop restartMeter=${restartMeter}`,
+                async () => await stopBrowserRecognitionCore(restartMeter));
+        }
+
+        async function stopBrowserRecognitionCore(restartMeter = true) {
             if (!browserRecognizer) {
                 browserRecognizerRoomId = "";
                 currentRecognitionDeviceId = "";
@@ -1582,43 +1613,53 @@
         }
 
         async function startRoom(roomId) {
-            if (roomId !== currentRoomId) {
-                await switchRoom(roomId);
-            }
-            sourceLanguageAutoFallbackUsed = false;
-
-            const payload = {
-                sourceLanguage: sourceLanguageEl.value
-            };
-
-            const response = await fetchJson(`${roomApiBase(roomId)}/session/start`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) {
-                addDebugLine(`room start failed room=${roomId} msg=${response.errorMessage}`, "error");
-                throw new Error(response.errorMessage);
-            }
-            addDebugLine(`room start ok room=${roomId} source=${payload.sourceLanguage}`);
-
-            if (roomId === currentRoomId) {
-                updateStatus(response.data);
-            } else {
-                await refreshStatusSafe();
+            if (startRoomInProgress) {
+                addDebugLine(`start room ignored (in progress) room=${roomId}`, "warn");
+                return;
             }
 
+            startRoomInProgress = true;
             try {
-                await startBrowserRecognition(roomId, sourceLanguageEl.value);
-            } catch (err) {
-                await stopRoom(roomId, "recognizer-start-failed");
-                await refreshStatusSafe();
-                await refreshRoomsSafe();
-                throw err;
-            }
+                if (roomId !== currentRoomId) {
+                    await switchRoom(roomId);
+                }
+                sourceLanguageAutoFallbackUsed = false;
 
-            await refreshRoomsSafe();
-            addLine(`[system] Room ${roomId} started.`, true);
+                const payload = {
+                    sourceLanguage: sourceLanguageEl.value
+                };
+
+                const response = await fetchJson(`${roomApiBase(roomId)}/session/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    addDebugLine(`room start failed room=${roomId} msg=${response.errorMessage}`, "error");
+                    throw new Error(response.errorMessage);
+                }
+                addDebugLine(`room start ok room=${roomId} source=${payload.sourceLanguage}`);
+
+                if (roomId === currentRoomId) {
+                    updateStatus(response.data);
+                } else {
+                    await refreshStatusSafe();
+                }
+
+                try {
+                    await startBrowserRecognition(roomId, sourceLanguageEl.value);
+                } catch (err) {
+                    await stopRoom(roomId, "recognizer-start-failed");
+                    await refreshStatusSafe();
+                    await refreshRoomsSafe();
+                    throw err;
+                }
+
+                await refreshRoomsSafe();
+                addLine(`[system] Room ${roomId} started.`, true);
+            } finally {
+                startRoomInProgress = false;
+            }
         }
 
         async function stopRoom(roomId, reason = "manual") {
