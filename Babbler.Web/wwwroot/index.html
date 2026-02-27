@@ -427,6 +427,8 @@
         let freeLimitReached = false;
         let browserRecognizer = null;
         let browserRecognizerRoomId = "";
+        let roomRecoveryInProgress = false;
+        let lastPublishErrorAt = 0;
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -853,8 +855,12 @@
                 sourceLanguage,
                 isFinal,
                 translations
-            }).catch(() => {
-                // Keep translating even on occasional transient publish failures.
+            }).catch(err => {
+                // Keep translating even on transient publish failures.
+                if (Date.now() - lastPublishErrorAt > 5000) {
+                    lastPublishErrorAt = Date.now();
+                    addLine(`[error] Live publish failed: ${err?.message || err}`, true);
+                }
             });
         }
 
@@ -1025,7 +1031,12 @@
         async function refreshStatusSafe() {
             try {
                 await refreshStatus();
-            } catch {
+            } catch (err) {
+                if (isRoomNotFoundError(err?.message)) {
+                    await recoverFromMissingRoom("Current room no longer exists.");
+                    return;
+                }
+
                 // Ignore transient poll errors and keep trying.
             }
         }
@@ -1035,6 +1046,27 @@
                 await refreshRooms();
             } catch {
                 // Ignore transient poll errors and keep trying.
+            }
+        }
+
+        function isRoomNotFoundError(message) {
+            return (message || "").toLowerCase().includes("not found");
+        }
+
+        async function recoverFromMissingRoom(reason) {
+            if (roomRecoveryInProgress) {
+                return;
+            }
+
+            roomRecoveryInProgress = true;
+            try {
+                addLine(`[system] ${reason} Creating a new room.`, true);
+                const room = await createRoom();
+                await switchRoom((room?.roomId || "").toUpperCase());
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to recover from missing room."}`, true);
+            } finally {
+                roomRecoveryInProgress = false;
             }
         }
 
