@@ -164,10 +164,7 @@
         }
 
         const connection = new signalRClient.HubConnectionBuilder()
-            .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
-                transport: signalRClient.HttpTransportType.WebSockets,
-                skipNegotiation: true
-            })
+            .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`)
             .withAutomaticReconnect()
             .build();
 
@@ -190,6 +187,21 @@
                 langsEl.textContent = `Room: ${roomId}`;
             }
             timeEl.textContent = new Date(data.timestampUtc).toLocaleTimeString();
+        });
+
+        connection.onreconnecting(() => {
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = "Reconnecting...";
+        });
+
+        connection.onreconnected(() => {
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = "Connected. Waiting for translation...";
+        });
+
+        connection.onclose(() => {
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = "Disconnected. Please refresh.";
         });
 
         targetLanguageEl.addEventListener("change", async () => {
@@ -318,6 +330,8 @@
 
         init().catch(err => {
             console.error(`Connection failed: ${err.message}`);
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = "Connection failed. Please refresh.";
         });
     </script>
 </body>

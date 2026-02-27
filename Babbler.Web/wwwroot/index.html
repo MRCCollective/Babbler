@@ -927,10 +927,7 @@
             }
 
             const nextConnection = new signalRClient.HubConnectionBuilder()
-                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
-                    transport: signalRClient.HttpTransportType.WebSockets,
-                    skipNegotiation: true
-                })
+                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`)
                 .withAutomaticReconnect()
                 .build();
 
@@ -948,6 +945,19 @@
 
                 const marker = data.isFinal ? "final" : "partial";
                 addLine(`[${marker}] ${data.translatedText}`);
+            });
+
+            nextConnection.onreconnecting(() => {
+                addLine("[system] Reconnecting live feed...", true);
+            });
+
+            nextConnection.onreconnected(() => {
+                addLine("[system] Live feed reconnected.", true);
+            });
+
+            nextConnection.onclose(err => {
+                const message = err?.message || "Connection closed.";
+                addLine(`[error] Live feed disconnected: ${message}`, true);
             });
 
             await nextConnection.start();
