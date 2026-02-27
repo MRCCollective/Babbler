@@ -927,7 +927,9 @@
             }
 
             const nextConnection = new signalRClient.HubConnectionBuilder()
-                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`)
+                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
+                    transport: signalRClient.HttpTransportType.LongPolling
+                })
                 .withAutomaticReconnect()
                 .build();
 
