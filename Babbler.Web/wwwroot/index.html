@@ -515,9 +515,12 @@
         let micMeterSource = null;
         let micMeterFrameHandle = null;
         let selectedMicDeviceId = "";
+        let currentRecognitionDeviceId = "";
         let micSwitchInProgress = false;
         let recognizerRestartInProgress = false;
         let lastRecognizerRestartAt = 0;
+        let micNoSpeechRecoveryInProgress = false;
+        let lastMicAutoFallbackAt = 0;
         let lastRoomDiagStateSignature = "";
         let lastRoomDiagWarningAt = 0;
         const signalRClient = window.signalR;
@@ -1107,6 +1110,7 @@
 
             browserRecognizer = recognizer;
             browserRecognizerRoomId = roomId;
+            currentRecognitionDeviceId = activeDeviceId;
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
@@ -1123,12 +1127,14 @@
         async function stopBrowserRecognition() {
             if (!browserRecognizer) {
                 browserRecognizerRoomId = "";
+                currentRecognitionDeviceId = "";
                 return;
             }
 
             const recognizer = browserRecognizer;
             browserRecognizer = null;
             browserRecognizerRoomId = "";
+            currentRecognitionDeviceId = "";
             stopMicWatchdog();
             stopMicLevelMeter();
 
@@ -1159,6 +1165,43 @@
 
                 lastMicWarningAt = now;
                 addLine("[error] No speech detected from microphone yet. Check browser mic input device and site permission.", true);
+
+                if (now - lastMicActivityAt < 25000) {
+                    return;
+                }
+
+                if (!currentRecognitionDeviceId || !browserRecognizerRoomId) {
+                    return;
+                }
+
+                if (micNoSpeechRecoveryInProgress || recognizerRestartInProgress) {
+                    return;
+                }
+
+                if (now - lastMicAutoFallbackAt < 30000) {
+                    return;
+                }
+
+                micNoSpeechRecoveryInProgress = true;
+                lastMicAutoFallbackAt = now;
+                addLine(
+                    "[system] No speech recognized from selected microphone. Switching to system default mic.",
+                    true);
+
+                selectedMicDeviceId = "";
+                currentRecognitionDeviceId = "";
+                micInputEl.value = "";
+
+                startBrowserRecognition(browserRecognizerRoomId, sourceLanguageEl.value)
+                    .then(() => {
+                        addLine("[system] Fallback to system default mic applied.", true);
+                    })
+                    .catch(err => {
+                        addLine(`[error] Automatic fallback to default mic failed: ${err?.message || err}`, true);
+                    })
+                    .finally(() => {
+                        micNoSpeechRecoveryInProgress = false;
+                    });
             }, 5000);
         }
 
