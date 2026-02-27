@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Babbler Control</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/assets/megaphone.svg" />
+    <style>
+        :root {
+            --bg: #081624;
+            --panel: #11253b;
+            --panel-soft: #193754;
+            --ink: #eef4fb;
+            --muted: #9fb5cc;
+            --accent: #ff7b29;
+            --danger: #db3c4c;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 20% 10%, #1b476b, transparent 35%),
+                radial-gradient(circle at 85% 90%, #572430, transparent 30%),
+                var(--bg);
+            padding: 2rem;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .panel {
+            background: rgba(17, 37, 59, 0.9);
+            border: 1px solid rgba(238, 244, 251, 0.12);
+            border-radius: 16px;
+            padding: 1.2rem;
+            backdrop-filter: blur(4px);
+        }
+
+        h1 {
+            margin: 0 0 0.5rem 0;
+            letter-spacing: 0.03em;
+        }
+
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .title-icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .access-box {
+            margin-top: 0.9rem;
+            border: 1px solid rgba(238, 244, 251, 0.14);
+            border-radius: 12px;
+            padding: 0.85rem;
+            background: rgba(10, 22, 36, 0.55);
+        }
+
+        .access-row {
+            display: flex;
+            gap: 0.65rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 0.4rem;
+        }
+
+        .access-value {
+            font-family: Consolas, monospace;
+            font-size: 0.95rem;
+            color: #d6e5f5;
+            word-break: break-all;
+        }
+
+        .access-pin {
+            font-family: Consolas, monospace;
+            font-size: 1.15rem;
+            letter-spacing: 0.08em;
+            color: #ffd2a7;
+            font-weight: 700;
+        }
+
+        .small-btn {
+            width: auto;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.8rem;
+        }
+
+        .icon-btn {
+            width: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.38rem;
+            border-radius: 8px;
+        }
+
+        .icon-btn svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
+
+        .grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            margin-top: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 0.35rem;
+        }
+
+        select, button {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(238, 244, 251, 0.2);
+            background: var(--panel-soft);
+            color: var(--ink);
+            padding: 0.65rem 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        button {
+            cursor: pointer;
+            transition: transform 120ms ease, filter 120ms ease;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        .start {
+            background: var(--accent);
+            border-color: transparent;
+            color: #101010;
+            font-weight: 600;
+        }
+
+        .stop {
+            background: var(--danger);
+            border-color: transparent;
+            color: white;
+            font-weight: 600;
+        }
+
+        #status {
+            font-weight: 600;
+            margin: 0;
+        }
+
+        #log {
+            height: 260px;
+            overflow: auto;
+            background: #06101b;
+            border-radius: 10px;
+            padding: 0.8rem;
+            font-family: Consolas, monospace;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+
+        .line {
+            margin: 0.28rem 0;
+            color: #d6e5f5;
+        }
+
+        .line.system {
+            color: #ffd2a7;
+        }
+
+        .rooms-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .rooms-head h2 {
+            margin: 0;
+        }
+
+        .rooms-grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .rooms-column h3 {
+            margin: 0 0 0.45rem;
+            font-size: 0.95rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .rooms-list {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .room-card {
+            border: 1px solid rgba(238, 244, 251, 0.12);
+            border-radius: 12px;
+            padding: 0.65rem;
+            background: rgba(8, 20, 34, 0.55);
+        }
+
+        .room-card.current {
+            border-color: rgba(255, 123, 41, 0.55);
+            box-shadow: 0 0 0 1px rgba(255, 123, 41, 0.28) inset;
+        }
+
+        .room-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .room-id {
+            font-family: Consolas, monospace;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            color: #ffd2a7;
+        }
+
+        .room-meta {
+            margin: 0.35rem 0 0;
+            color: #d6e5f5;
+            font-size: 0.84rem;
+        }
+
+        .pill {
+            border-radius: 999px;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+        }
+
+        .pill.running {
+            color: #0f2a13;
+            background: #9be39b;
+            border-color: #6fc66f;
+        }
+
+        .pill.stopped {
+            color: #4a3502;
+            background: #ffd87a;
+            border-color: #e0b348;
+        }
+
+        .room-actions {
+            margin-top: 0.5rem;
+            display: flex;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .room-actions button {
+            width: auto;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.8rem;
+        }
+
+        .ghost {
+            border-color: rgba(238, 244, 251, 0.25);
+            background: transparent;
+        }
+
+        .room-empty {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.86rem;
+            border: 1px dashed rgba(238, 244, 251, 0.18);
+            border-radius: 10px;
+            padding: 0.55rem 0.65rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="panel">
+            <div class="title-row">
+                <img class="title-icon" src="/assets/megaphone.svg" alt="Megaphone icon" />
+                <h1>Babbler POC Control</h1>
+            </div>
+            <p class="muted">Choose input language here. Target language is chosen on the display page.</p>
+            <p id="status">Session: checking...</p>
+            <p id="usage" class="muted">Free usage: checking...</p>
+            <div class="access-box">
+                <p class="muted">Room ID</p>
+                <div class="access-row">
+                    <span id="roomId" class="access-pin">------</span>
+                    <button id="newRoomBtn" class="small-btn" type="button">New Room</button>
+                </div>
+                <p class="muted">Mobile Join URL</p>
+                <div class="access-row">
+                    <span id="joinUrl" class="access-value">Loading...</span>
+                    <button id="copyJoinUrlBtn" class="small-btn" type="button">Copy URL</button>
+                </div>
+                <p class="muted">PIN</p>
+                <div class="access-row">
+                    <span id="joinPin" class="access-pin">------</span>
+                    <button id="copyPinBtn" class="icon-btn" type="button" title="Copy PIN" aria-label="Copy PIN">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H10V7h9v14z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div>
+                    <label for="sourceLanguage">Source Language</label>
+                    <select id="sourceLanguage">
+                        <option value="en-US">English (US)</option>
+                        <option value="sv-SE">Swedish (Sweden)</option>
+                        <option value="es-ES">Spanish (Spain)</option>
+                        <option value="fr-FR">French (France)</option>
+                        <option value="de-DE">German (Germany)</option>
+                        <option value="it-IT">Italian (Italy)</option>
+                        <option value="ja-JP">Japanese (Japan)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Session Controls</label>
+                    <button class="start" id="startBtn" type="button">Start Translation</button>
+                </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button class="stop" id="stopBtn" type="button">Stop Translation</button>
+                </div>
+                <div>
+                    <label>Display Output</label>
+                    <button id="openDisplayBtn" type="button">Open Fullscreen Display</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="rooms-head">
+                <h2>Rooms</h2>
+                <button id="refreshRoomsBtn" class="small-btn" type="button">Refresh Rooms</button>
+            </div>
+            <p class="muted">Active rooms are listed live. Stopped rooms stay visible for 2 minutes.</p>
+            <div class="rooms-grid">
+                <div class="rooms-column">
+                    <h3>Active</h3>
+                    <div id="activeRooms" class="rooms-list"></div>
+                </div>
+                <div class="rooms-column">
+                    <h3>Recently Stopped</h3>
+                    <div id="recentRooms" class="rooms-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Live Feed</h2>
+            <div id="log"></div>
+        </section>
+    </main>
+
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+    <script src="/lib/signalr/signalr.min.js"></script>
+    <script>
+        const statusEl = document.getElementById("status");
+        const usageEl = document.getElementById("usage");
+        const logEl = document.getElementById("log");
+        const roomIdEl = document.getElementById("roomId");
+        const newRoomBtn = document.getElementById("newRoomBtn");
+        const sourceLanguageEl = document.getElementById("sourceLanguage");
+        const joinUrlEl = document.getElementById("joinUrl");
+        const joinPinEl = document.getElementById("joinPin");
+        const copyJoinUrlBtn = document.getElementById("copyJoinUrlBtn");
+        const copyPinBtn = document.getElementById("copyPinBtn");
+        const startBtn = document.getElementById("startBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const openDisplayBtn = document.getElementById("openDisplayBtn");
+        const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
+        const activeRoomsEl = document.getElementById("activeRooms");
+        const recentRoomsEl = document.getElementById("recentRooms");
+        const recentlyStoppedWindowMs = 2 * 60 * 1000;
+        let currentRoomId = "";
+        let currentJoinPin = "";
+        let currentJoinUrl = "";
+        let statusPollHandle = null;
+        let roomPollHandle = null;
+        let connection = null;
+        let freeLimitReached = false;
+        let browserRecognizer = null;
+        let browserRecognizerRoomId = "";
+        const signalRClient = window.signalR;
+        const speechSdk = window.SpeechSDK;
+        const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
+
+        if (!signalRClient) {
+            statusEl.textContent = "Session: client library missing";
+            addLine("[error] SignalR client failed to load from /lib/signalr/signalr.min.js.", true);
+            throw new Error("SignalR client failed to load.");
+        }
+
+        if (!speechSdk) {
+            statusEl.textContent = "Session: speech library missing";
+            addLine("[error] Azure Speech JS SDK failed to load.", true);
+            throw new Error("Speech SDK failed to load.");
+        }
+
+        startBtn.addEventListener("click", async () => {
+            try {
+                await startRoom(currentRoomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to start session."}`, true);
+            }
+        });
+
+        stopBtn.addEventListener("click", async () => {
+            try {
+                await stopRoom(currentRoomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to stop session."}`, true);
+            }
+        });
+
+        openDisplayBtn.addEventListener("click", () => {
+            try {
+                openDisplay();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to open display."}`, true);
+            }
+        });
+
+        refreshRoomsBtn.addEventListener("click", async () => {
+            try {
+                await refreshRooms();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to load rooms."}`, true);
+            }
+        });
+
+        newRoomBtn.addEventListener("click", async () => {
+            newRoomBtn.disabled = true;
+            try {
+                const room = await createRoom();
+                addLine(`[system] New room created: ${room.roomId}`, true);
+                await switchRoom(room.roomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to create room."}`, true);
+            } finally {
+                newRoomBtn.disabled = false;
+            }
+        });
+
+        copyJoinUrlBtn.addEventListener("click", async () => {
+            if (!currentJoinUrl) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentJoinUrl);
+                addLine("[system] Join URL copied to clipboard.", true);
+            } catch {
+                addLine("[error] Clipboard copy failed.", true);
+            }
+        });
+
+        copyPinBtn.addEventListener("click", async () => {
+            if (!currentJoinPin) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentJoinPin);
+                addLine("[system] PIN copied to clipboard.", true);
+            } catch {
+                addLine("[error] Clipboard copy failed.", true);
+            }
+        });
+
+        function addLine(text, isSystem = false) {
+            const line = document.createElement("p");
+            line.className = isSystem ? "line system" : "line";
+            line.textContent = text;
+            logEl.prepend(line);
+        }
+
+        function updateStatus(state) {
+            freeLimitReached = Boolean(state.freeLimitReached);
+
+            const running = state.isRunning ? "running" : "stopped";
+            const languages = state.sourceLanguage && state.targetLanguage
+                ? ` (${state.sourceLanguage} -> ${state.targetLanguage})`
+                : "";
+            const roomLabel = currentRoomId ? ` (${currentRoomId})` : "";
+            statusEl.textContent = `Session${roomLabel}: ${running}${languages}`;
+
+            const used = formatMinutes(state.freeMinutesUsed);
+            const limit = formatMinutes(state.freeMinutesLimit);
+            const remaining = formatMinutes(state.freeMinutesRemaining);
+            const blocked = state.freeLimitReached ? " (limit reached)" : "";
+            usageEl.textContent = `Free usage: ${used} / ${limit} min used, ${remaining} min left${blocked}`;
+
+            startBtn.disabled = freeLimitReached;
+            stopBtn.disabled = !state.isRunning;
+        }
+
+        function formatMinutes(value) {
+            const numeric = Number(value);
+            if (Number.isNaN(numeric)) {
+                return "0.00";
+            }
+
+            return numeric.toFixed(2);
+        }
+
+        function roomApiBase(roomId = currentRoomId) {
+            if (!roomId) {
+                throw new Error("No room selected.");
+            }
+
+            return `/api/rooms/${encodeURIComponent(roomId)}`;
+        }
+
+        function getRoomIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return (params.get("roomId") || "").trim().toUpperCase();
+        }
+
+        function setRoomIdInQuery(roomId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("roomId", roomId);
+            window.history.replaceState({}, "", url);
+        }
+
+        async function refreshStatus() {
+            const response = await fetchJson(`${roomApiBase()}/session/status`);
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            updateStatus(response.data);
+
+            if (!response.data?.isRunning && browserRecognizerRoomId === currentRoomId) {
+                await stopBrowserRecognition();
+            }
+        }
+
+        async function refreshAccessInfo() {
+            const response = await fetchJson(`${roomApiBase()}/access-info`);
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            currentRoomId = response.data?.roomId || currentRoomId;
+            currentJoinPin = response.data?.pin || "";
+            currentJoinUrl = response.data?.joinUrl || "";
+
+            roomIdEl.textContent = currentRoomId || "------";
+            joinPinEl.textContent = currentJoinPin || "------";
+            joinUrlEl.textContent = currentJoinUrl || "Unavailable";
+        }
+
+        async function createRoom() {
+            const response = await fetchJson("/api/rooms", {
+                method: "POST"
+            });
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            return response.data;
+        }
+
+        async function refreshRooms() {
+            const response = await fetchJson("/api/rooms");
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            const rooms = Array.isArray(response.data) ? response.data : [];
+            const activeRooms = rooms.filter(room => room.isRunning);
+            const recentlyStoppedRooms = rooms.filter(room =>
+                !room.isRunning && isRecentlyStopped(room));
+
+            renderRoomList(activeRoomsEl, activeRooms, true, "No active rooms.");
+            renderRoomList(recentRoomsEl, recentlyStoppedRooms, false, "No recently stopped rooms.");
+        }
+
+        function isRecentlyStopped(room) {
+            if (!room || !room.lastStoppedAtUtc) {
+                return false;
+            }
+
+            const stoppedAt = Date.parse(room.lastStoppedAtUtc);
+            if (Number.isNaN(stoppedAt)) {
+                return false;
+            }
+
+            return Date.now() - stoppedAt <= recentlyStoppedWindowMs;
+        }
+
+        function renderRoomList(container, rooms, isActiveList, emptyMessage) {
+            container.replaceChildren();
+
+            if (!rooms.length) {
+                const empty = document.createElement("p");
+                empty.className = "room-empty";
+                empty.textContent = emptyMessage;
+                container.appendChild(empty);
+                return;
+            }
+
+            for (const room of rooms) {
+                container.appendChild(buildRoomCard(room, isActiveList));
+            }
+        }
+
+        function buildRoomCard(room, isActiveList) {
+            const card = document.createElement("article");
+            card.className = "room-card";
+            if (room.roomId === currentRoomId) {
+                card.classList.add("current");
+            }
+
+            const top = document.createElement("div");
+            top.className = "room-top";
+
+            const roomId = document.createElement("span");
+            roomId.className = "room-id";
+            roomId.textContent = room.roomId;
+
+            const pill = document.createElement("span");
+            pill.className = `pill ${room.isRunning ? "running" : "stopped"}`;
+            pill.textContent = room.isRunning ? "Running" : "Stopped";
+
+            top.appendChild(roomId);
+            top.appendChild(pill);
+            card.appendChild(top);
+
+            const meta = document.createElement("p");
+            meta.className = "room-meta";
+            meta.textContent = describeRoomLanguage(room);
+            card.appendChild(meta);
+
+            const actions = document.createElement("div");
+            actions.className = "room-actions";
+
+            actions.appendChild(makeActionButton("Select", "ghost", async () => {
+                await switchRoom(room.roomId);
+            }));
+
+            actions.appendChild(makeActionButton("Open", "ghost", async () => {
+                openDisplay(room.roomId);
+            }));
+
+            if (isActiveList) {
+                actions.appendChild(makeActionButton("Stop", "stop", async () => {
+                    await stopRoom(room.roomId);
+                }));
+            } else {
+                const startButton = makeActionButton("Start", "start", async () => {
+                    await startRoom(room.roomId);
+                });
+                startButton.disabled = freeLimitReached;
+                actions.appendChild(startButton);
+            }
+
+            card.appendChild(actions);
+            return card;
+        }
+
+        function describeRoomLanguage(room) {
+            if (room.sourceLanguage && room.targetLanguage) {
+                return `${room.sourceLanguage} -> ${room.targetLanguage}`;
+            }
+
+            if (room.targetLanguage) {
+                return `target ${room.targetLanguage}`;
+            }
+
+            return "no language selected yet";
+        }
+
+        function makeActionButton(label, className, action) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = className;
+            button.textContent = label;
+            button.addEventListener("click", async () => {
+                if (button.disabled) {
+                    return;
+                }
+
+                button.disabled = true;
+                try {
+                    await action();
+                } catch (err) {
+                    addLine(`[error] ${err.message || "Action failed."}`, true);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+
+            return button;
+        }
+
+        async function getSpeechToken() {
+            const response = await fetchJson("/api/speech/token");
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            const token = response.data?.token;
+            const region = response.data?.region;
+            if (!token || !region) {
+                throw new Error("Speech token response was invalid.");
+            }
+
+            return { token, region };
+        }
+
+        function toPromise(startOrStop) {
+            return new Promise((resolve, reject) => {
+                startOrStop(resolve, reject);
+            });
+        }
+
+        async function startBrowserRecognition(roomId, sourceLanguage) {
+            if (!connection) {
+                throw new Error("SignalR connection is not ready.");
+            }
+
+            if (browserRecognizer) {
+                await stopBrowserRecognition();
+            }
+
+            const speechToken = await getSpeechToken();
+            const speechConfig = speechSdk.SpeechTranslationConfig
+                .fromAuthorizationToken(speechToken.token, speechToken.region);
+            speechConfig.speechRecognitionLanguage = sourceLanguage;
+
+            for (const targetLanguage of supportedTargetLanguages) {
+                speechConfig.addTargetLanguage(targetLanguage);
+            }
+
+            const recognizer = new speechSdk.TranslationRecognizer(
+                speechConfig,
+                speechSdk.AudioConfig.fromDefaultMicrophoneInput());
+
+            recognizer.recognizing = (_, event) => {
+                publishRecognitionResult(sourceLanguage, false, event?.result);
+            };
+
+            recognizer.recognized = (_, event) => {
+                publishRecognitionResult(sourceLanguage, true, event?.result);
+            };
+
+            recognizer.canceled = (_, event) => {
+                const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
+                addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
+                stopRoom(roomId).catch(() => {
+                    // Keep UI alive even if stop call fails.
+                });
+            };
+
+            try {
+                await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
+            } catch {
+                recognizer.close();
+                throw new Error("Microphone access denied or unavailable.");
+            }
+
+            browserRecognizer = recognizer;
+            browserRecognizerRoomId = roomId;
+        }
+
+        async function stopBrowserRecognition() {
+            if (!browserRecognizer) {
+                browserRecognizerRoomId = "";
+                return;
+            }
+
+            const recognizer = browserRecognizer;
+            browserRecognizer = null;
+            browserRecognizerRoomId = "";
+
+            try {
+                await toPromise((ok, fail) => recognizer.stopContinuousRecognitionAsync(ok, fail));
+            } catch {
+                // Ignore recognizer stop errors.
+            }
+
+            recognizer.close();
+        }
+
+        function publishRecognitionResult(sourceLanguage, isFinal, result) {
+            if (!connection || !result) {
+                return;
+            }
+
+            const sourceText = (result.text || "").trim();
+            const translations = {};
+            for (const targetLanguage of supportedTargetLanguages) {
+                const translated = result.translations?.get?.(targetLanguage);
+                if (translated && translated.trim()) {
+                    translations[targetLanguage] = translated;
+                }
+            }
+
+            if (!sourceText && Object.keys(translations).length === 0) {
+                return;
+            }
+
+            connection.invoke("PublishClientTranslation", {
+                sourceText,
+                sourceLanguage,
+                isFinal,
+                translations
+            }).catch(() => {
+                // Keep translating even on occasional transient publish failures.
+            });
+        }
+
+        async function startRoom(roomId) {
+            if (roomId !== currentRoomId) {
+                await switchRoom(roomId);
+            }
+
+            const payload = {
+                sourceLanguage: sourceLanguageEl.value
+            };
+
+            const response = await fetchJson(`${roomApiBase(roomId)}/session/start`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            if (roomId === currentRoomId) {
+                updateStatus(response.data);
+            } else {
+                await refreshStatusSafe();
+            }
+
+            try {
+                await startBrowserRecognition(roomId, sourceLanguageEl.value);
+            } catch (err) {
+                await fetchJson(`${roomApiBase(roomId)}/session/stop`, { method: "POST" });
+                await refreshStatusSafe();
+                await refreshRoomsSafe();
+                throw err;
+            }
+
+            await refreshRoomsSafe();
+            addLine(`[system] Room ${roomId} started.`, true);
+        }
+
+        async function stopRoom(roomId) {
+            if (browserRecognizerRoomId === roomId) {
+                await stopBrowserRecognition();
+            }
+
+            const response = await fetchJson(`${roomApiBase(roomId)}/session/stop`, {
+                method: "POST"
+            });
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            if (roomId === currentRoomId) {
+                updateStatus(response.data);
+            } else {
+                await refreshStatusSafe();
+            }
+
+            await refreshRoomsSafe();
+            addLine(`[system] Room ${roomId} stopped.`, true);
+        }
+
+        async function connectToRoom(roomId) {
+            if (connection) {
+                try {
+                    await connection.stop();
+                } catch {
+                    // Ignore connection stop errors.
+                }
+            }
+
+            const nextConnection = new signalRClient.HubConnectionBuilder()
+                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
+                    transport: signalRClient.HttpTransportType.WebSockets,
+                    skipNegotiation: true
+                })
+                .withAutomaticReconnect()
+                .build();
+
+            nextConnection.on("translationUpdate", data => {
+                if (data.systemMessage) {
+                    addLine(`[system] ${data.systemMessage}`, true);
+                    refreshStatusSafe();
+                    refreshRoomsSafe();
+                    return;
+                }
+
+                if (!data.translatedText) {
+                    return;
+                }
+
+                const marker = data.isFinal ? "final" : "partial";
+                addLine(`[${marker}] ${data.translatedText}`);
+            });
+
+            await nextConnection.start();
+            connection = nextConnection;
+        }
+
+        async function switchRoom(roomId) {
+            if (browserRecognizerRoomId && browserRecognizerRoomId !== roomId) {
+                await stopRoom(browserRecognizerRoomId);
+            }
+
+            currentRoomId = roomId;
+            setRoomIdInQuery(roomId);
+            await connectToRoom(roomId);
+            await refreshAccessInfo();
+            await refreshStatus();
+            await refreshRoomsSafe();
+        }
+
+        async function ensureRoom() {
+            const requestedRoomId = getRoomIdFromQuery();
+            if (requestedRoomId) {
+                try {
+                    await switchRoom(requestedRoomId);
+                    return;
+                } catch {
+                    addLine(`[system] Room ${requestedRoomId} not found. Creating a new room.`, true);
+                }
+            }
+
+            const room = await createRoom();
+            await switchRoom((room?.roomId || "").toUpperCase());
+        }
+
+        function openDisplay(roomId = currentRoomId) {
+            if (!roomId) {
+                throw new Error("No room selected.");
+            }
+
+            window.open(`/join.html?roomId=${encodeURIComponent(roomId)}`, "_blank");
+        }
+
+        function startStatusPolling() {
+            if (statusPollHandle !== null) {
+                clearInterval(statusPollHandle);
+            }
+
+            statusPollHandle = setInterval(async () => {
+                await refreshStatusSafe();
+            }, 5000);
+        }
+
+        function startRoomPolling() {
+            if (roomPollHandle !== null) {
+                clearInterval(roomPollHandle);
+            }
+
+            roomPollHandle = setInterval(async () => {
+                await refreshRoomsSafe();
+            }, 4000);
+        }
+
+        async function refreshStatusSafe() {
+            try {
+                await refreshStatus();
+            } catch {
+                // Ignore transient poll errors and keep trying.
+            }
+        }
+
+        async function refreshRoomsSafe() {
+            try {
+                await refreshRooms();
+            } catch {
+                // Ignore transient poll errors and keep trying.
+            }
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options || {});
+            const raw = await response.text();
+
+            let data = null;
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = null;
+                }
+            }
+
+            let errorMessage = `Request failed (${response.status}).`;
+            if (data && data.error) {
+                errorMessage = data.error;
+            } else if (raw) {
+                errorMessage = raw;
+            }
+
+            return {
+                ok: response.ok,
+                data,
+                errorMessage
+            };
+        }
+
+        async function init() {
+            await ensureRoom();
+            await refreshRoomsSafe();
+            startStatusPolling();
+            startRoomPolling();
+        }
+
+        init().catch(err => addLine(`[error] ${err.message}`, true));
+    </script>
+</body>
+</html>

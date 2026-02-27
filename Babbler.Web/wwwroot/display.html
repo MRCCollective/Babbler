@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Babbler Display</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/assets/megaphone.svg" />
+    <style>
+        :root {
+            --bg: #02050a;
+            --text: #f9fdff;
+            --accent: #6ae7ff;
+            --muted: #8fa3b7;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 10% 10%, #0d2a3c, transparent 25%),
+                radial-gradient(circle at 90% 80%, #2d1022, transparent 30%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .stage {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 1rem;
+            padding: 1.2rem 1.7rem 2rem 1.7rem;
+        }
+
+        .top {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .top select,
+        .top button {
+            border: 1px solid rgba(249, 253, 255, 0.25);
+            color: var(--text);
+            border-radius: 999px;
+            background: rgba(10, 20, 33, 0.8);
+            padding: 0.45rem 0.85rem;
+            font-size: 0.95rem;
+        }
+
+        .top select {
+            min-width: 165px;
+            cursor: pointer;
+            appearance: none;
+            background-image:
+                linear-gradient(45deg, transparent 50%, var(--text) 50%),
+                linear-gradient(135deg, var(--text) 50%, transparent 50%);
+            background-position:
+                calc(100% - 16px) calc(50% - 3px),
+                calc(100% - 10px) calc(50% - 3px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+            padding-right: 1.9rem;
+        }
+
+        .top select:focus,
+        .top button:focus {
+            outline: 2px solid rgba(106, 231, 255, 0.75);
+            outline-offset: 2px;
+        }
+
+        .top button {
+            cursor: pointer;
+        }
+
+        .subtitle {
+            align-self: end;
+            font-size: clamp(2rem, 6vw, 5.4rem);
+            line-height: 1.05;
+            font-weight: 700;
+            text-wrap: balance;
+            text-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
+            opacity: 1;
+            transition: opacity 170ms ease-out;
+        }
+
+        .subtitle.fade-out {
+            opacity: 0;
+        }
+
+        .bottom {
+            display: flex;
+            justify-content: space-between;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="stage">
+        <header class="top">
+            <div class="toolbar">
+                <select id="targetLanguage" title="Target language">
+                    <option value="en">English</option>
+                    <option value="sv">Swedish</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="ja">Japanese</option>
+                </select>
+                <button type="button" id="fullscreenBtn">Fullscreen</button>
+            </div>
+        </header>
+
+        <section>
+            <div id="subtitle" class="subtitle">Waiting for translation...</div>
+        </section>
+
+        <footer class="bottom">
+            <span id="langs"></span>
+            <span id="time"></span>
+        </footer>
+    </main>
+
+    <script src="/lib/signalr/signalr.min.js"></script>
+    <script>
+        const SUBTITLE_CLEAR_IDLE_MS = 2200;
+        const SUBTITLE_FADE_DURATION_MS = 170;
+        const subtitleEl = document.getElementById("subtitle");
+        const langsEl = document.getElementById("langs");
+        const timeEl = document.getElementById("time");
+        const targetLanguageEl = document.getElementById("targetLanguage");
+        const fullscreenBtn = document.getElementById("fullscreenBtn");
+        const signalRClient = window.signalR;
+        let subtitleClearTimer = null;
+        let subtitleVersion = 0;
+        const roomId = getRoomIdFromQuery();
+
+        if (!roomId) {
+            window.location.href = "/join.html";
+            throw new Error("Room ID is missing.");
+        }
+
+        if (!signalRClient) {
+            console.error("SignalR client failed to load.");
+            throw new Error("SignalR client failed to load.");
+        }
+
+        const connection = new signalRClient.HubConnectionBuilder()
+            .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
+                transport: signalRClient.HttpTransportType.WebSockets,
+                skipNegotiation: true
+            })
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("translationUpdate", data => {
+            if (data.systemMessage) {
+                return;
+            }
+
+            if (!data.translatedText) {
+                return;
+            }
+
+            showSubtitle(data.translatedText);
+            if (data.targetLanguage) {
+                langsEl.textContent = `Room: ${roomId} | Target: ${data.targetLanguage}`;
+                if (targetLanguageEl.value !== data.targetLanguage) {
+                    targetLanguageEl.value = data.targetLanguage;
+                }
+            } else {
+                langsEl.textContent = `Room: ${roomId}`;
+            }
+            timeEl.textContent = new Date(data.timestampUtc).toLocaleTimeString();
+        });
+
+        targetLanguageEl.addEventListener("change", async () => {
+            try {
+                const response = await fetchJson(`${roomApiBase()}/session/target`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ targetLanguage: targetLanguageEl.value })
+                });
+
+                if (!response.ok) {
+                    throw new Error(response.errorMessage);
+                }
+
+                applyStatus(response.data);
+            } catch (err) {
+                console.error(`Unable to change target language: ${err.message || err}`);
+                await refreshStatus();
+            }
+        });
+
+        function showSubtitle(text) {
+            subtitleVersion += 1;
+            const currentVersion = subtitleVersion;
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = text;
+
+            if (subtitleClearTimer !== null) {
+                clearTimeout(subtitleClearTimer);
+            }
+
+            subtitleClearTimer = setTimeout(() => {
+                clearSubtitleWithFade(currentVersion);
+            }, SUBTITLE_CLEAR_IDLE_MS);
+        }
+
+        function clearSubtitleWithFade(version) {
+            if (version !== subtitleVersion) {
+                return;
+            }
+
+            subtitleEl.classList.add("fade-out");
+            setTimeout(() => {
+                if (version !== subtitleVersion) {
+                    return;
+                }
+
+                subtitleEl.textContent = "";
+            }, SUBTITLE_FADE_DURATION_MS);
+        }
+
+        fullscreenBtn.addEventListener("click", async () => {
+            if (!document.fullscreenElement) {
+                await document.documentElement.requestFullscreen();
+            } else {
+                await document.exitFullscreen();
+            }
+        });
+
+        function applyStatus(state) {
+            if (!state) {
+                return;
+            }
+
+            if (state.targetLanguage) {
+                if (targetLanguageEl.value !== state.targetLanguage) {
+                    targetLanguageEl.value = state.targetLanguage;
+                }
+                langsEl.textContent = `Room: ${roomId} | Target: ${state.targetLanguage}`;
+                return;
+            }
+
+            langsEl.textContent = `Room: ${roomId}`;
+        }
+
+        async function refreshStatus() {
+            const response = await fetchJson(`${roomApiBase()}/session/status`);
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            applyStatus(response.data);
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options);
+            const raw = await response.text();
+
+            let data = null;
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = null;
+                }
+            }
+
+            let errorMessage = `Request failed (${response.status}).`;
+            if (data && data.error) {
+                errorMessage = data.error;
+            } else if (raw) {
+                errorMessage = raw;
+            }
+
+            return {
+                ok: response.ok,
+                data,
+                errorMessage
+            };
+        }
+
+        function roomApiBase() {
+            return `/api/rooms/${encodeURIComponent(roomId)}`;
+        }
+
+        function getRoomIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return (params.get("roomId") || "").replace(/[^a-z0-9]/gi, "").toUpperCase().trim();
+        }
+
+        async function init() {
+            await connection.start();
+            langsEl.textContent = `Room: ${roomId}`;
+            await refreshStatus();
+        }
+
+        init().catch(err => {
+            console.error(`Connection failed: ${err.message}`);
+        });
+    </script>
+</body>
+</html>

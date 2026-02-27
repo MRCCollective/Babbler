@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Babbler Join</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+        :root {
+            --bg: #081624;
+            --card: #11253b;
+            --ink: #eef4fb;
+            --muted: #9fb5cc;
+            --accent: #ff7b29;
+            --danger: #db3c4c;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background:
+                radial-gradient(circle at 15% 20%, #1b476b, transparent 35%),
+                radial-gradient(circle at 90% 85%, #572430, transparent 30%),
+                var(--bg);
+            color: var(--ink);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: grid;
+            place-items: center;
+            padding: 1.2rem;
+        }
+
+        .card {
+            width: min(420px, 100%);
+            border-radius: 16px;
+            background: rgba(17, 37, 59, 0.92);
+            border: 1px solid rgba(238, 244, 251, 0.14);
+            padding: 1.2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.55rem;
+        }
+
+        .muted {
+            color: var(--muted);
+            margin: 0 0 1rem 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.35rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        input, button {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(238, 244, 251, 0.2);
+            background: #193754;
+            color: var(--ink);
+            padding: 0.7rem 0.8rem;
+            font-size: 1rem;
+        }
+
+        input {
+            font-family: Consolas, monospace;
+            letter-spacing: 0.14em;
+            text-align: center;
+        }
+
+        button {
+            margin-top: 0.8rem;
+            background: var(--accent);
+            color: #101010;
+            border-color: transparent;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .error {
+            margin-top: 0.75rem;
+            color: #ffb8bf;
+            min-height: 1.2rem;
+        }
+
+        .hint {
+            margin-top: 0.8rem;
+            font-size: 0.86rem;
+            color: var(--muted);
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <h1>Join Display</h1>
+        <p class="muted">Enter the PIN shown on the control page to open the live display.</p>
+
+        <form id="pinForm">
+            <label for="roomId">Room ID</label>
+            <input id="roomId" name="roomId" inputmode="text" autocomplete="off" maxlength="24" placeholder="ABCD12" />
+
+            <label for="pin">Access PIN</label>
+            <input id="pin" name="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
+            <button type="submit">Open Display</button>
+        </form>
+
+        <p id="error" class="error"></p>
+        <p class="hint">If this keeps failing, ask the host for the latest PIN.</p>
+    </main>
+
+    <script>
+        const formEl = document.getElementById("pinForm");
+        const roomIdEl = document.getElementById("roomId");
+        const pinEl = document.getElementById("pin");
+        const errorEl = document.getElementById("error");
+
+        roomIdEl.value = getRoomIdFromQuery();
+
+        formEl.addEventListener("submit", async event => {
+            event.preventDefault();
+            errorEl.textContent = "";
+
+            const roomId = normalizeRoomId(roomIdEl.value);
+            if (!roomId) {
+                errorEl.textContent = "Room ID is required.";
+                return;
+            }
+
+            const pin = normalizePin(pinEl.value);
+            if (!pin) {
+                errorEl.textContent = "PIN is required.";
+                return;
+            }
+
+            const response = await fetchJson(`/api/rooms/${encodeURIComponent(roomId)}/access/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pin })
+            });
+
+            if (!response.ok) {
+                errorEl.textContent = response.errorMessage || "Invalid PIN.";
+                return;
+            }
+
+            window.location.href = `/display.html?roomId=${encodeURIComponent(roomId)}`;
+        });
+
+        function getRoomIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return normalizeRoomId(params.get("roomId") || "");
+        }
+
+        function normalizeRoomId(value) {
+            return (value || "").replace(/[^a-z0-9]/gi, "").toUpperCase().trim();
+        }
+
+        function normalizePin(value) {
+            return (value || "").replace(/\D/g, "").trim();
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options);
+            const raw = await response.text();
+
+            let data = null;
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = null;
+                }
+            }
+
+            let errorMessage = `Request failed (${response.status}).`;
+            if (data && data.error) {
+                errorMessage = data.error;
+            } else if (raw) {
+                errorMessage = raw;
+            }
+
+            return {
+                ok: response.ok,
+                data,
+                errorMessage
+            };
+        }
+    </script>
+</body>
+</html>
