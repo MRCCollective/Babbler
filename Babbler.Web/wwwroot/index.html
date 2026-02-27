@@ -438,6 +438,10 @@
                     <label>Display Output</label>
                     <button id="openDisplayBtn" type="button">Open Fullscreen Display</button>
                 </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button id="testCaptionBtn" class="ghost" type="button">Test Output</button>
+                </div>
             </div>
         </section>
 
@@ -481,6 +485,7 @@
         const startBtn = document.getElementById("startBtn");
         const stopBtn = document.getElementById("stopBtn");
         const openDisplayBtn = document.getElementById("openDisplayBtn");
+        const testCaptionBtn = document.getElementById("testCaptionBtn");
         const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
         const activeRoomsEl = document.getElementById("activeRooms");
         const recentRoomsEl = document.getElementById("recentRooms");
@@ -494,6 +499,7 @@
         let statusPollHandle = null;
         let roomPollHandle = null;
         let diagPollHandle = null;
+        let roomDiagPollHandle = null;
         let connection = null;
         let freeLimitReached = false;
         let browserRecognizer = null;
@@ -512,6 +518,8 @@
         let micSwitchInProgress = false;
         let recognizerRestartInProgress = false;
         let lastRecognizerRestartAt = 0;
+        let lastRoomDiagStateSignature = "";
+        let lastRoomDiagWarningAt = 0;
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -549,6 +557,14 @@
                 openDisplay();
             } catch (err) {
                 addLine(`[error] ${err.message || "Unable to open display."}`, true);
+            }
+        });
+
+        testCaptionBtn.addEventListener("click", async () => {
+            try {
+                await sendTestCaption();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to send test output."}`, true);
             }
         });
 
@@ -1400,11 +1416,13 @@
             }
 
             currentRoomId = roomId;
+            lastRoomDiagStateSignature = "";
             setRoomIdInQuery(roomId);
             await connectToRoom(roomId);
             await refreshAccessInfo();
             await refreshStatus();
             await refreshRoomsSafe();
+            await refreshRoomDiagnosticsSafe();
         }
 
         async function ensureRoom() {
@@ -1491,6 +1509,75 @@
             }
         }
 
+        async function refreshRoomDiagnostics() {
+            const response = await fetchJson(`${roomApiBase()}/diag`);
+            if (!response.ok || !response.data) {
+                throw new Error(response.errorMessage || "Room diagnostics unavailable.");
+            }
+
+            const diag = response.data;
+            const publishAgeMs = diag.lastClientPublishAtUtc
+                ? Date.now() - Date.parse(diag.lastClientPublishAtUtc)
+                : null;
+
+            const signature = [
+                diag.isRunning ? "running" : "stopped",
+                diag.lastStopReason || "",
+                diag.lastClientPublishAtUtc || "",
+                diag.activeHubConnections ?? 0
+            ].join("|");
+
+            if (signature !== lastRoomDiagStateSignature) {
+                lastRoomDiagStateSignature = signature;
+                if (!diag.isRunning && diag.lastStopReason) {
+                    addLine(`[system] Room stop reason: ${diag.lastStopReason}`, true);
+                }
+            }
+
+            if (diag.isRunning && (publishAgeMs === null || publishAgeMs > 15000)) {
+                const now = Date.now();
+                if (now - lastRoomDiagWarningAt > 15000) {
+                    lastRoomDiagWarningAt = now;
+                    addLine(
+                        `[error] No captions published recently while room is running (clients=${diag.activeHubConnections ?? 0}).`,
+                        true);
+                }
+            }
+        }
+
+        async function refreshRoomDiagnosticsSafe() {
+            try {
+                await refreshRoomDiagnostics();
+            } catch {
+                // Ignore transient room diagnostic errors.
+            }
+        }
+
+        function startRoomDiagnosticsPolling() {
+            if (roomDiagPollHandle !== null) {
+                clearInterval(roomDiagPollHandle);
+            }
+
+            roomDiagPollHandle = setInterval(async () => {
+                await refreshRoomDiagnosticsSafe();
+            }, 7000);
+        }
+
+        async function sendTestCaption() {
+            const testText = `Caption test ${new Date().toLocaleTimeString()}`;
+            const response = await fetchJson(`${roomApiBase()}/debug/test-caption`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: testText })
+            });
+
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            addLine(`[system] Test caption sent: ${testText}`, true);
+        }
+
         function isRoomNotFoundError(message) {
             return (message || "").toLowerCase().includes("not found");
         }
@@ -1548,8 +1635,10 @@
             await ensureRoom();
             await refreshRoomsSafe();
             await refreshDiagnosticsSafe();
+            await refreshRoomDiagnosticsSafe();
             startStatusPolling();
             startRoomPolling();
+            startRoomDiagnosticsPolling();
 
             if (diagPollHandle !== null) {
                 clearInterval(diagPollHandle);

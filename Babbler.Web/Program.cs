@@ -163,6 +163,21 @@ app.MapGet("/api/rooms/{roomId}/session/status", async (
     }
 });
 
+app.MapGet("/api/rooms/{roomId}/diag", async (
+    string roomId,
+    TranslationSessionService session,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return Results.Ok(await session.GetRoomDiagnosticsAsync(roomId, cancellationToken));
+    }
+    catch (InvalidOperationException ex)
+    {
+        return ToRoomError(ex);
+    }
+});
+
 app.MapPost("/api/rooms/{roomId}/session/start", async (
     string roomId,
     StartSessionRequest request,
@@ -246,6 +261,29 @@ app.MapPost("/api/rooms/{roomId}/session/stop", async (
     }
 });
 
+app.MapPost("/api/rooms/{roomId}/debug/test-caption", async (
+    string roomId,
+    TestCaptionRequest request,
+    TranslationSessionService session,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        await session.PublishTestCaptionAsync(roomId, request.Text, cancellationToken);
+        return Results.Ok(new { success = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return ToRoomError(ex);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
 app.Run();
 
 static IResult ToRoomError(InvalidOperationException exception)
@@ -261,3 +299,4 @@ static IResult ToRoomError(InvalidOperationException exception)
 internal sealed record VerifyPinRequest(string Pin);
 internal sealed record StartSessionRequest(string SourceLanguage, string? TargetLanguage);
 internal sealed record SetTargetRequest(string TargetLanguage);
+internal sealed record TestCaptionRequest(string? Text);

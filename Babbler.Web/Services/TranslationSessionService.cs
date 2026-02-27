@@ -212,6 +212,10 @@ public sealed class TranslationSessionService : IAsyncDisposable
                 payload.IsFinal,
                 DateTimeOffset.UtcNow,
                 null);
+
+            room.LastClientPublishAtUtc = update.TimestampUtc;
+            room.LastClientSourceText = update.SourceText;
+            room.LastClientTranslatedText = update.TranslatedText;
         }
         finally
         {
@@ -271,6 +275,81 @@ public sealed class TranslationSessionService : IAsyncDisposable
         {
             _gate.Release();
         }
+    }
+
+    public async Task<RoomDiagnostics> GetRoomDiagnosticsAsync(
+        string roomId,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await EnsureUsageLoadedAsync(cancellationToken);
+            EnsureCurrentUsageMonth();
+
+            var room = GetRoomOrThrow(roomId);
+            var status = BuildStatus(room);
+
+            return new RoomDiagnostics(
+                room.RoomId,
+                room.IsRunning,
+                room.SourceLanguage,
+                room.TargetLanguage,
+                room.LastStateChangedAtUtc,
+                room.LastStoppedAtUtc,
+                room.LastStopReason,
+                room.LastClientPublishAtUtc,
+                room.LastClientSourceText,
+                room.LastClientTranslatedText,
+                TranslationHub.GetRoomConnectionCount(room.RoomId),
+                status.FreeMinutesUsed,
+                status.FreeMinutesRemaining,
+                DateTimeOffset.UtcNow);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task PublishTestCaptionAsync(
+        string roomId,
+        string? text,
+        CancellationToken cancellationToken = default)
+    {
+        TranslationUpdate update;
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var room = GetRoomOrThrow(roomId);
+            var safeText = string.IsNullOrWhiteSpace(text)
+                ? $"Test caption {DateTimeOffset.UtcNow:HH:mm:ss}"
+                : text.Trim();
+
+            var sourceLanguage = room.SourceLanguage ?? "en-US";
+            var targetLanguage = NormalizeTargetLanguage(room.TargetLanguage);
+            var now = DateTimeOffset.UtcNow;
+            update = new TranslationUpdate(
+                safeText,
+                safeText,
+                sourceLanguage,
+                targetLanguage,
+                true,
+                now,
+                null);
+
+            room.LastClientPublishAtUtc = now;
+            room.LastClientSourceText = safeText;
+            room.LastClientTranslatedText = safeText;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        await _hubContext.Clients.Group(roomId)
+            .SendAsync("translationUpdate", update, cancellationToken);
     }
 
     public async Task StartAsync(
@@ -344,7 +423,11 @@ public sealed class TranslationSessionService : IAsyncDisposable
             EnsureCurrentUsageMonth();
 
             var room = GetRoomOrThrow(roomId);
-            await StopRoomInternalAsync(room, BuildStopMessage(reason));
+            var normalizedReason = NormalizeStopReason(reason);
+            await StopRoomInternalAsync(
+                room,
+                BuildStopMessage(normalizedReason),
+                normalizedReason);
         }
         finally
         {
@@ -422,7 +505,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
         if (room.IsRunning)
         {
-            await StopRoomInternalAsync(room);
+            await StopRoomInternalAsync(room, stopReason: "restart");
         }
 
         var remainingFreeTime = GetFreeMinutesRemaining();
@@ -438,6 +521,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
         room.SessionStartedAtUtc = startedAt;
         room.LastStateChangedAtUtc = startedAt;
         room.LastStoppedAtUtc = null;
+        room.LastStopReason = null;
 
         StartUsagePersistMonitor();
 
@@ -460,6 +544,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
     private async Task StopRoomInternalAsync(
         RoomSession room,
         string stopMessage = "Microphone translation stopped.",
+        string? stopReason = null,
         bool persistUsage = true)
     {
         var usageChanged = CaptureRoomUsedFreeMinutes(room);
@@ -468,6 +553,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
         room.SessionStartedAtUtc = null;
         room.LastStateChangedAtUtc = stoppedAt;
         room.LastStoppedAtUtc = stoppedAt;
+        room.LastStopReason = NormalizeStopReason(stopReason);
 
         try
         {
@@ -497,6 +583,13 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
         var normalizedReason = reason.Trim();
         return $"{defaultMessage} (reason: {normalizedReason})";
+    }
+
+    private static string? NormalizeStopReason(string? reason)
+    {
+        return string.IsNullOrWhiteSpace(reason)
+            ? null
+            : reason.Trim();
     }
 
     private void EnsureSpeechConfigured()
@@ -703,6 +796,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
                             await StopRoomInternalAsync(
                                 room,
                                 "Free translation minutes are used up. Session stopped.",
+                                stopReason: "free-limit",
                                 persistUsage: false);
                         }
 
@@ -936,5 +1030,13 @@ public sealed class TranslationSessionService : IAsyncDisposable
         public DateTimeOffset LastStateChangedAtUtc { get; set; }
 
         public DateTimeOffset? LastStoppedAtUtc { get; set; }
+
+        public string? LastStopReason { get; set; }
+
+        public DateTimeOffset? LastClientPublishAtUtc { get; set; }
+
+        public string? LastClientSourceText { get; set; }
+
+        public string? LastClientTranslatedText { get; set; }
     }
 }

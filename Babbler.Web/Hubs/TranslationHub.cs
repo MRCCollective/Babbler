@@ -1,6 +1,7 @@
 using Babbler.Web.Models;
 using Babbler.Web.Services;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace Babbler.Web.Hubs;
@@ -8,6 +9,8 @@ namespace Babbler.Web.Hubs;
 public sealed class TranslationHub : Hub
 {
     private const string RoomIdItemKey = "roomId";
+    private static readonly ConcurrentDictionary<string, int> RoomConnectionCounts =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly TranslationSessionService _session;
 
     public TranslationHub(TranslationSessionService session)
@@ -22,6 +25,7 @@ public sealed class TranslationHub : Hub
         {
             Context.Items[RoomIdItemKey] = roomId;
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
+            IncrementRoomConnection(roomId);
         }
 
         await base.OnConnectedAsync();
@@ -34,6 +38,7 @@ public sealed class TranslationHub : Hub
             !string.IsNullOrWhiteSpace(roomId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomId);
+            DecrementRoomConnection(roomId);
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -164,5 +169,44 @@ public sealed class TranslationHub : Hub
 
         value = default;
         return false;
+    }
+
+    public static int GetRoomConnectionCount(string roomId)
+    {
+        if (string.IsNullOrWhiteSpace(roomId))
+        {
+            return 0;
+        }
+
+        return RoomConnectionCounts.TryGetValue(roomId, out var count)
+            ? Math.Max(0, count)
+            : 0;
+    }
+
+    private static void IncrementRoomConnection(string roomId)
+    {
+        RoomConnectionCounts.AddOrUpdate(roomId, 1, static (_, count) => count + 1);
+    }
+
+    private static void DecrementRoomConnection(string roomId)
+    {
+        while (true)
+        {
+            if (!RoomConnectionCounts.TryGetValue(roomId, out var current))
+            {
+                return;
+            }
+
+            if (current <= 1)
+            {
+                RoomConnectionCounts.TryRemove(roomId, out _);
+                return;
+            }
+
+            if (RoomConnectionCounts.TryUpdate(roomId, current - 1, current))
+            {
+                return;
+            }
+        }
     }
 }
