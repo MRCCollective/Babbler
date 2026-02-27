@@ -778,8 +778,12 @@
             const speechConfig = speechSdk.SpeechTranslationConfig
                 .fromAuthorizationToken(speechToken.token, speechToken.region);
             speechConfig.speechRecognitionLanguage = sourceLanguage;
+            const sourceNeutralLanguage = (sourceLanguage || "").split("-")[0].toLowerCase();
 
             for (const targetLanguage of supportedTargetLanguages) {
+                if (targetLanguage.toLowerCase() === sourceNeutralLanguage) {
+                    continue;
+                }
                 speechConfig.addTargetLanguage(targetLanguage);
             }
 
@@ -795,6 +799,10 @@
                 publishRecognitionResult(sourceLanguage, true, event?.result);
             };
 
+            recognizer.sessionStopped = () => {
+                addLine("[system] Speech session stopped.", true);
+            };
+
             recognizer.canceled = (_, event) => {
                 const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
                 addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
@@ -805,13 +813,14 @@
 
             try {
                 await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
-            } catch {
+            } catch (err) {
                 recognizer.close();
-                throw new Error("Microphone access denied or unavailable.");
+                throw new Error(`Microphone start failed: ${err?.message || err || "unknown error"}`);
             }
 
             browserRecognizer = recognizer;
             browserRecognizerRoomId = roomId;
+            addLine(`[system] Microphone active (${sourceLanguage} -> room target).`, true);
         }
 
         async function stopBrowserRecognition() {

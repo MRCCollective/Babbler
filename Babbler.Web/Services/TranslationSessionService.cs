@@ -192,6 +192,12 @@ public sealed class TranslationSessionService : IAsyncDisposable
             var sourceText = payload.SourceText?.Trim();
             var targetLanguage = NormalizeTargetLanguage(room.TargetLanguage);
             var translatedText = GetTranslatedTextForTarget(payload.Translations, targetLanguage);
+            if (string.IsNullOrWhiteSpace(translatedText) &&
+                !string.IsNullOrWhiteSpace(sourceText))
+            {
+                // Fallback to source text (caption mode) when target translation is absent.
+                translatedText = sourceText;
+            }
 
             if (string.IsNullOrWhiteSpace(sourceText) && string.IsNullOrWhiteSpace(translatedText))
             {
@@ -504,6 +510,22 @@ public sealed class TranslationSessionService : IAsyncDisposable
         foreach (var pair in translations)
         {
             if (string.Equals(pair.Key, targetLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                return pair.Value;
+            }
+        }
+
+        foreach (var pair in translations)
+        {
+            if (pair.Key.StartsWith(targetLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                return pair.Value;
+            }
+        }
+
+        foreach (var pair in translations)
+        {
+            if (!string.IsNullOrWhiteSpace(pair.Value))
             {
                 return pair.Value;
             }
