@@ -1051,8 +1051,9 @@
             }
 
             if (browserRecognizer) {
-                await stopBrowserRecognition();
+                await stopBrowserRecognition(false);
             }
+            stopMicLevelMeter();
 
             const speechToken = await getSpeechToken();
             const speechConfig = speechSdk.SpeechTranslationConfig
@@ -1114,20 +1115,24 @@
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
-            await startMicLevelMeter(activeDeviceId);
             await refreshMicrophoneDevices(true);
             if (activeDeviceId &&
                 Array.from(micInputEl.options).some(option => option.value === activeDeviceId))
             {
                 micInputEl.value = activeDeviceId;
             }
+            setMicLevel(0);
+            addLine("[system] Mic level meter paused during active translation for device compatibility.", true);
             addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
         }
 
-        async function stopBrowserRecognition() {
+        async function stopBrowserRecognition(restartMeter = true) {
             if (!browserRecognizer) {
                 browserRecognizerRoomId = "";
                 currentRecognitionDeviceId = "";
+                if (restartMeter) {
+                    await startMicLevelMeter(getSelectedMicDeviceId());
+                }
                 return;
             }
 
@@ -1145,6 +1150,9 @@
             }
 
             recognizer.close();
+            if (restartMeter) {
+                await startMicLevelMeter(getSelectedMicDeviceId());
+            }
         }
 
         function startMicWatchdog() {
