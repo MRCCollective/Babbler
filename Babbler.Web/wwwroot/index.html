@@ -128,6 +128,22 @@
             margin-top: 1rem;
         }
 
+        .inline-row {
+            display: flex;
+            gap: 0.45rem;
+            align-items: stretch;
+        }
+
+        .inline-row select {
+            flex: 1;
+        }
+
+        .inline-row .small-btn {
+            flex: 0 0 auto;
+            margin: 0;
+            align-self: stretch;
+        }
+
         label {
             display: block;
             font-size: 0.85rem;
@@ -405,6 +421,13 @@
                     </select>
                 </div>
                 <div>
+                    <label for="micInput">Microphone Input</label>
+                    <div class="inline-row">
+                        <select id="micInput"></select>
+                        <button id="refreshMicsBtn" class="small-btn" type="button">Refresh</button>
+                    </div>
+                </div>
+                <div>
                     <label>Session Controls</label>
                     <button class="start" id="startBtn" type="button">Start Translation</button>
                 </div>
@@ -462,6 +485,8 @@
         const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
         const activeRoomsEl = document.getElementById("activeRooms");
         const recentRoomsEl = document.getElementById("recentRooms");
+        const micInputEl = document.getElementById("micInput");
+        const refreshMicsBtn = document.getElementById("refreshMicsBtn");
         const micLevelFillEl = document.getElementById("micLevelFill");
         const micLevelValueEl = document.getElementById("micLevelValue");
         const recentlyStoppedWindowMs = 2 * 60 * 1000;
@@ -485,6 +510,7 @@
         let micMeterAnalyser = null;
         let micMeterSource = null;
         let micMeterFrameHandle = null;
+        let selectedMicDeviceId = "";
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -532,6 +558,34 @@
                 addLine(`[error] ${err.message || "Unable to load rooms."}`, true);
             }
         });
+
+        refreshMicsBtn.addEventListener("click", async () => {
+            refreshMicsBtn.disabled = true;
+            try {
+                await refreshMicrophoneDevices(true);
+                addLine(`[system] Mic devices refreshed. Selected: ${getSelectedMicLabel()}`, true);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to refresh microphones."}`, true);
+            } finally {
+                refreshMicsBtn.disabled = false;
+            }
+        });
+
+        micInputEl.addEventListener("change", () => {
+            selectedMicDeviceId = getSelectedMicDeviceId();
+            addLine(`[system] Mic input selected: ${getSelectedMicLabel()}`, true);
+            if (browserRecognizer) {
+                addLine("[system] Restart translation to apply microphone change.", true);
+            }
+        });
+
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
+            navigator.mediaDevices.addEventListener("devicechange", () => {
+                refreshMicrophoneDevices(true).catch(() => {
+                    // Ignore transient media device change errors.
+                });
+            });
+        }
 
         newRoomBtn.addEventListener("click", async () => {
             newRoomBtn.disabled = true;
@@ -819,6 +873,65 @@
             return { token, region };
         }
 
+        function getSelectedMicDeviceId() {
+            const value = (micInputEl.value || "").trim();
+            return value || "";
+        }
+
+        function getSelectedMicLabel() {
+            const option = micInputEl.options[micInputEl.selectedIndex];
+            return option?.textContent?.trim() || "Default microphone";
+        }
+
+        async function refreshMicrophoneDevices(preserveSelection) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                micInputEl.innerHTML = "";
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "Microphone selection unsupported";
+                micInputEl.appendChild(option);
+                micInputEl.disabled = true;
+                selectedMicDeviceId = "";
+                return;
+            }
+
+            const previousValue = preserveSelection ? getSelectedMicDeviceId() : "";
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const microphones = devices.filter(device => device.kind === "audioinput");
+
+            micInputEl.innerHTML = "";
+
+            const defaultOption = document.createElement("option");
+            defaultOption.value = "";
+            defaultOption.textContent = "System default microphone";
+            micInputEl.appendChild(defaultOption);
+
+            microphones.forEach((device, index) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId || "";
+                option.textContent = device.label || `Microphone ${index + 1}`;
+                micInputEl.appendChild(option);
+            });
+
+            const canRestore = previousValue &&
+                Array.from(micInputEl.options).some(option => option.value === previousValue);
+            micInputEl.value = canRestore ? previousValue : "";
+            selectedMicDeviceId = getSelectedMicDeviceId();
+            micInputEl.disabled = false;
+        }
+
+        function createSpeechAudioConfig(deviceId) {
+            if (deviceId && typeof speechSdk.AudioConfig.fromMicrophoneInput === "function") {
+                try {
+                    return speechSdk.AudioConfig.fromMicrophoneInput(deviceId);
+                } catch (err) {
+                    addLine(`[error] Selected mic could not be opened. Falling back to default. (${err?.message || err})`, true);
+                }
+            }
+
+            return speechSdk.AudioConfig.fromDefaultMicrophoneInput();
+        }
+
         function toPromise(startOrStop) {
             return new Promise((resolve, reject) => {
                 startOrStop(resolve, reject);
@@ -847,9 +960,12 @@
                 speechConfig.addTargetLanguage(targetLanguage);
             }
 
+            const selectedDeviceId = getSelectedMicDeviceId();
+            const audioConfig = createSpeechAudioConfig(selectedDeviceId);
+
             const recognizer = new speechSdk.TranslationRecognizer(
                 speechConfig,
-                speechSdk.AudioConfig.fromDefaultMicrophoneInput());
+                audioConfig);
 
             recognizer.recognizing = (_, event) => {
                 if (event?.result?.text) {
@@ -891,8 +1007,9 @@
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
-            await startMicLevelMeter();
-            addLine(`[system] Microphone active (${sourceLanguage} -> room target).`, true);
+            await startMicLevelMeter(selectedDeviceId);
+            await refreshMicrophoneDevices(true);
+            addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${getSelectedMicLabel()}".`, true);
         }
 
         async function stopBrowserRecognition() {
@@ -944,13 +1061,23 @@
             }
         }
 
-        async function startMicLevelMeter() {
+        async function startMicLevelMeter(deviceId) {
             if (micMeterAnalyser) {
                 return;
             }
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const audioConstraint = deviceId
+                    ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+                let stream = null;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: false });
+                } catch {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                }
+
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const analyser = audioContext.createAnalyser();
                 analyser.fftSize = 1024;
@@ -1320,6 +1447,11 @@
         }
 
         async function init() {
+            try {
+                await refreshMicrophoneDevices(true);
+            } catch (err) {
+                addLine(`[error] Mic device list unavailable: ${err?.message || err}`, true);
+            }
             await ensureRoom();
             await refreshRoomsSafe();
             await refreshDiagnosticsSafe();
