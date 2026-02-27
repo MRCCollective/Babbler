@@ -456,7 +456,7 @@
 
         stopBtn.addEventListener("click", async () => {
             try {
-                await stopRoom(currentRoomId);
+                await stopRoom(currentRoomId, "manual");
             } catch (err) {
                 addLine(`[error] ${err.message || "Unable to stop session."}`, true);
             }
@@ -588,6 +588,11 @@
         async function refreshAccessInfo() {
             const response = await fetchJson(`${roomApiBase()}/access-info`);
             if (!response.ok) {
+                if (isRoomNotFoundError(response.errorMessage)) {
+                    await recoverFromMissingRoom("Room access info not found.");
+                    return;
+                }
+
                 throw new Error(response.errorMessage);
             }
 
@@ -695,7 +700,7 @@
 
             if (isActiveList) {
                 actions.appendChild(makeActionButton("Stop", "stop", async () => {
-                    await stopRoom(room.roomId);
+                    await stopRoom(room.roomId, "manual");
                 }));
             } else {
                 const startButton = makeActionButton("Start", "start", async () => {
@@ -806,7 +811,8 @@
             recognizer.canceled = (_, event) => {
                 const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
                 addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
-                stopRoom(roomId).catch(() => {
+                const reason = `speech-canceled-${(event?.reason || "unknown").toString().toLowerCase()}`;
+                stopRoom(roomId, reason).catch(() => {
                     // Keep UI alive even if stop call fails.
                 });
             };
@@ -901,7 +907,7 @@
             try {
                 await startBrowserRecognition(roomId, sourceLanguageEl.value);
             } catch (err) {
-                await fetchJson(`${roomApiBase(roomId)}/session/stop`, { method: "POST" });
+                await stopRoom(roomId, "recognizer-start-failed");
                 await refreshStatusSafe();
                 await refreshRoomsSafe();
                 throw err;
@@ -911,12 +917,13 @@
             addLine(`[system] Room ${roomId} started.`, true);
         }
 
-        async function stopRoom(roomId) {
+        async function stopRoom(roomId, reason = "manual") {
             if (browserRecognizerRoomId === roomId) {
                 await stopBrowserRecognition();
             }
 
-            const response = await fetchJson(`${roomApiBase(roomId)}/session/stop`, {
+            const reasonParam = encodeURIComponent((reason || "manual").trim());
+            const response = await fetchJson(`${roomApiBase(roomId)}/session/stop?reason=${reasonParam}`, {
                 method: "POST"
             });
             if (!response.ok) {
@@ -930,7 +937,7 @@
             }
 
             await refreshRoomsSafe();
-            addLine(`[system] Room ${roomId} stopped.`, true);
+            addLine(`[system] Room ${roomId} stopped (${reason}).`, true);
         }
 
         async function connectToRoom(roomId) {
@@ -984,7 +991,7 @@
 
         async function switchRoom(roomId) {
             if (browserRecognizerRoomId && browserRecognizerRoomId !== roomId) {
-                await stopRoom(browserRecognizerRoomId);
+                await stopRoom(browserRecognizerRoomId, "switch-room");
             }
 
             currentRoomId = roomId;

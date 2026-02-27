@@ -225,17 +225,24 @@ app.MapPost("/api/rooms/{roomId}/session/target", async (
 
 app.MapPost("/api/rooms/{roomId}/session/stop", async (
     string roomId,
+    string? reason,
     TranslationSessionService session,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        await session.StopAsync(roomId, cancellationToken);
+        await session.StopAsync(roomId, reason, cancellationToken);
         return Results.Ok(await session.GetStatusAsync(roomId, cancellationToken));
     }
     catch (InvalidOperationException ex)
     {
         return ToRoomError(ex);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            detail: ex.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
     }
 });
 

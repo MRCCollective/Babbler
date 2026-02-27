@@ -334,6 +334,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
     public async Task StopAsync(
         string roomId,
+        string? reason = null,
         CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -343,7 +344,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
             EnsureCurrentUsageMonth();
 
             var room = GetRoomOrThrow(roomId);
-            await StopRoomInternalAsync(room);
+            await StopRoomInternalAsync(room, BuildStopMessage(reason));
         }
         finally
         {
@@ -440,10 +441,20 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
         StartUsagePersistMonitor();
 
-        await PublishSystemMessageAsync(
-            room.RoomId,
-            $"Microphone stream connected ({sourceLanguage} -> {targetLanguage}). " +
-            $"Free time left: {remainingFreeTime.TotalMinutes:F2} minutes.");
+        try
+        {
+            await PublishSystemMessageAsync(
+                room.RoomId,
+                $"Microphone stream connected ({sourceLanguage} -> {targetLanguage}). " +
+                $"Free time left: {remainingFreeTime.TotalMinutes:F2} minutes.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish start message for room {RoomId}.",
+                room.RoomId);
+        }
     }
 
     private async Task StopRoomInternalAsync(
@@ -458,12 +469,34 @@ public sealed class TranslationSessionService : IAsyncDisposable
         room.LastStateChangedAtUtc = stoppedAt;
         room.LastStoppedAtUtc = stoppedAt;
 
-        await PublishSystemMessageAsync(room.RoomId, stopMessage);
+        try
+        {
+            await PublishSystemMessageAsync(room.RoomId, stopMessage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish stop message for room {RoomId}.",
+                room.RoomId);
+        }
 
         if (usageChanged && persistUsage)
         {
             await PersistUsageAsync(GetFreeMinutesUsed(), CancellationToken.None);
         }
+    }
+
+    private static string BuildStopMessage(string? reason)
+    {
+        const string defaultMessage = "Microphone translation stopped.";
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return defaultMessage;
+        }
+
+        var normalizedReason = reason.Trim();
+        return $"{defaultMessage} (reason: {normalizedReason})";
     }
 
     private void EnsureSpeechConfigured()
