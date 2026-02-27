@@ -424,7 +424,6 @@
                     <label for="micInput">Microphone Input</label>
                     <div class="inline-row">
                         <select id="micInput"></select>
-                        <button id="refreshMicsBtn" class="small-btn" type="button">Refresh</button>
                     </div>
                 </div>
                 <div>
@@ -486,7 +485,6 @@
         const activeRoomsEl = document.getElementById("activeRooms");
         const recentRoomsEl = document.getElementById("recentRooms");
         const micInputEl = document.getElementById("micInput");
-        const refreshMicsBtn = document.getElementById("refreshMicsBtn");
         const micLevelFillEl = document.getElementById("micLevelFill");
         const micLevelValueEl = document.getElementById("micLevelValue");
         const recentlyStoppedWindowMs = 2 * 60 * 1000;
@@ -511,6 +509,9 @@
         let micMeterSource = null;
         let micMeterFrameHandle = null;
         let selectedMicDeviceId = "";
+        let micSwitchInProgress = false;
+        let recognizerRestartInProgress = false;
+        let lastRecognizerRestartAt = 0;
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -559,23 +560,41 @@
             }
         });
 
-        refreshMicsBtn.addEventListener("click", async () => {
-            refreshMicsBtn.disabled = true;
-            try {
-                await refreshMicrophoneDevices(true);
-                addLine(`[system] Mic devices refreshed. Selected: ${getSelectedMicLabel()}`, true);
-            } catch (err) {
-                addLine(`[error] ${err.message || "Unable to refresh microphones."}`, true);
-            } finally {
-                refreshMicsBtn.disabled = false;
-            }
-        });
+        micInputEl.addEventListener("change", async () => {
+            const requestedMicDeviceId = getSelectedMicDeviceId();
 
-        micInputEl.addEventListener("change", () => {
-            selectedMicDeviceId = getSelectedMicDeviceId();
-            addLine(`[system] Mic input selected: ${getSelectedMicLabel()}`, true);
-            if (browserRecognizer) {
-                addLine("[system] Restart translation to apply microphone change.", true);
+            if (micSwitchInProgress) {
+                return;
+            }
+
+            micSwitchInProgress = true;
+            try {
+                await ensureMicrophonePermission();
+                await refreshMicrophoneDevices(true);
+
+                if (requestedMicDeviceId &&
+                    Array.from(micInputEl.options).some(option => option.value === requestedMicDeviceId))
+                {
+                    micInputEl.value = requestedMicDeviceId;
+                }
+
+                selectedMicDeviceId = getSelectedMicDeviceId();
+                const selectedLabel = getSelectedMicLabel();
+                addLine(`[system] Mic input selected: ${selectedLabel}`, true);
+
+                if (browserRecognizer && browserRecognizerRoomId) {
+                    addLine("[system] Applying microphone change...", true);
+                    await startBrowserRecognition(browserRecognizerRoomId, sourceLanguageEl.value);
+                    addLine(`[system] Microphone switched to "${selectedLabel}".`, true);
+                    return;
+                }
+
+                stopMicLevelMeter();
+                await startMicLevelMeter(selectedMicDeviceId);
+            } catch (err) {
+                addLine(`[error] Unable to switch microphone now: ${err?.message || err}`, true);
+            } finally {
+                micSwitchInProgress = false;
             }
         });
 
@@ -920,6 +939,23 @@
             micInputEl.disabled = false;
         }
 
+        async function ensureMicrophonePermission() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return;
+            }
+
+            let stream = null;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            } finally {
+                if (stream) {
+                    for (const track of stream.getTracks()) {
+                        track.stop();
+                    }
+                }
+            }
+        }
+
         function createSpeechAudioConfig(deviceId) {
             if (deviceId && typeof speechSdk.AudioConfig.fromMicrophoneInput === "function") {
                 try {
@@ -930,6 +966,58 @@
             }
 
             return speechSdk.AudioConfig.fromDefaultMicrophoneInput();
+        }
+
+        function buildTranslationRecognizer(speechConfig, audioConfig, roomId, sourceLanguage) {
+            const recognizer = new speechSdk.TranslationRecognizer(
+                speechConfig,
+                audioConfig);
+
+            recognizer.recognizing = (_, event) => {
+                if (event?.result?.text) {
+                    lastMicActivityAt = Date.now();
+                }
+                publishRecognitionResult(sourceLanguage, false, event?.result);
+            };
+
+            recognizer.recognized = (_, event) => {
+                if (event?.result?.text) {
+                    lastMicActivityAt = Date.now();
+                    addLine(`[mic-final] ${event.result.text}`);
+                }
+                publishRecognitionResult(sourceLanguage, true, event?.result);
+            };
+
+            recognizer.sessionStopped = () => {
+                addLine("[system] Speech session stopped.", true);
+            };
+
+            recognizer.canceled = (_, event) => {
+                const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
+                addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
+
+                if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
+                    return;
+                }
+
+                const now = Date.now();
+                if (recognizerRestartInProgress || now - lastRecognizerRestartAt < 4000) {
+                    return;
+                }
+
+                lastRecognizerRestartAt = now;
+                recognizerRestartInProgress = true;
+                addLine("[system] Restarting microphone recognition...", true);
+                startBrowserRecognition(roomId, sourceLanguage).then(() => {
+                    addLine("[system] Microphone recognition restarted.", true);
+                }).catch(err => {
+                    addLine(`[error] Auto-restart failed: ${err?.message || err}`, true);
+                }).finally(() => {
+                    recognizerRestartInProgress = false;
+                });
+            };
+
+            return recognizer;
         }
 
         function toPromise(startOrStop) {
@@ -961,45 +1049,44 @@
             }
 
             const selectedDeviceId = getSelectedMicDeviceId();
-            const audioConfig = createSpeechAudioConfig(selectedDeviceId);
-
-            const recognizer = new speechSdk.TranslationRecognizer(
+            let recognizer = buildTranslationRecognizer(
                 speechConfig,
-                audioConfig);
-
-            recognizer.recognizing = (_, event) => {
-                if (event?.result?.text) {
-                    lastMicActivityAt = Date.now();
-                }
-                publishRecognitionResult(sourceLanguage, false, event?.result);
-            };
-
-            recognizer.recognized = (_, event) => {
-                if (event?.result?.text) {
-                    lastMicActivityAt = Date.now();
-                    addLine(`[mic-final] ${event.result.text}`);
-                }
-                publishRecognitionResult(sourceLanguage, true, event?.result);
-            };
-
-            recognizer.sessionStopped = () => {
-                addLine("[system] Speech session stopped.", true);
-            };
-
-            recognizer.canceled = (_, event) => {
-                const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
-                addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
-                const reason = `speech-canceled-${(event?.reason || "unknown").toString().toLowerCase()}`;
-                stopRoom(roomId, reason).catch(() => {
-                    // Keep UI alive even if stop call fails.
-                });
-            };
-
+                createSpeechAudioConfig(selectedDeviceId),
+                roomId,
+                sourceLanguage);
+            let activeDeviceId = selectedDeviceId;
+            let activeDeviceLabel = getSelectedMicLabel();
             try {
                 await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
             } catch (err) {
                 recognizer.close();
-                throw new Error(`Microphone start failed: ${err?.message || err || "unknown error"}`);
+
+                if (!selectedDeviceId) {
+                    throw new Error(`Microphone start failed: ${err?.message || err || "unknown error"}`);
+                }
+
+                addLine(
+                    `[error] Selected microphone failed to start. Retrying system default. (${err?.message || err || "unknown error"})`,
+                    true);
+
+                activeDeviceId = "";
+                activeDeviceLabel = "System default microphone";
+                selectedMicDeviceId = "";
+                micInputEl.value = "";
+
+                recognizer = buildTranslationRecognizer(
+                    speechConfig,
+                    speechSdk.AudioConfig.fromDefaultMicrophoneInput(),
+                    roomId,
+                    sourceLanguage);
+
+                try {
+                    await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
+                } catch (retryErr) {
+                    recognizer.close();
+                    throw new Error(
+                        `Microphone start failed after fallback: ${retryErr?.message || retryErr || "unknown error"}`);
+                }
             }
 
             browserRecognizer = recognizer;
@@ -1007,9 +1094,14 @@
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
-            await startMicLevelMeter(selectedDeviceId);
+            await startMicLevelMeter(activeDeviceId);
             await refreshMicrophoneDevices(true);
-            addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${getSelectedMicLabel()}".`, true);
+            if (activeDeviceId &&
+                Array.from(micInputEl.options).some(option => option.value === activeDeviceId))
+            {
+                micInputEl.value = activeDeviceId;
+            }
+            addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
         }
 
         async function stopBrowserRecognition() {
