@@ -181,6 +181,44 @@
             margin: 0;
         }
 
+        .meter-row {
+            margin-top: 0.45rem;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .meter-label {
+            color: var(--muted);
+            font-size: 0.85rem;
+            min-width: 72px;
+        }
+
+        .meter-track {
+            flex: 1 1 220px;
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(238, 244, 251, 0.14);
+            overflow: hidden;
+            border: 1px solid rgba(238, 244, 251, 0.2);
+        }
+
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #27d87d, #ffe067, #ff7b29);
+            transition: width 80ms linear;
+        }
+
+        .meter-value {
+            color: #d6e5f5;
+            font-family: Consolas, monospace;
+            font-size: 0.82rem;
+            min-width: 58px;
+            text-align: right;
+        }
+
         #log {
             height: 260px;
             overflow: auto;
@@ -324,6 +362,13 @@
             <p class="muted">Choose input language here. Target language is chosen on the display page.</p>
             <p id="status">Session: checking...</p>
             <p id="usage" class="muted">Free usage: checking...</p>
+            <div class="meter-row">
+                <span class="meter-label">Mic Level</span>
+                <div class="meter-track" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100">
+                    <div id="micLevelFill" class="meter-fill"></div>
+                </div>
+                <span id="micLevelValue" class="meter-value">0%</span>
+            </div>
             <div class="access-box">
                 <p class="muted">Room ID</p>
                 <div class="access-row">
@@ -417,6 +462,8 @@
         const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
         const activeRoomsEl = document.getElementById("activeRooms");
         const recentRoomsEl = document.getElementById("recentRooms");
+        const micLevelFillEl = document.getElementById("micLevelFill");
+        const micLevelValueEl = document.getElementById("micLevelValue");
         const recentlyStoppedWindowMs = 2 * 60 * 1000;
         let currentRoomId = "";
         let currentJoinPin = "";
@@ -433,6 +480,11 @@
         let lastMicWarningAt = 0;
         let roomRecoveryInProgress = false;
         let lastPublishErrorAt = 0;
+        let micMeterAudioContext = null;
+        let micMeterStream = null;
+        let micMeterAnalyser = null;
+        let micMeterSource = null;
+        let micMeterFrameHandle = null;
         const signalRClient = window.signalR;
         const speechSdk = window.SpeechSDK;
         const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
@@ -839,6 +891,7 @@
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
+            await startMicLevelMeter();
             addLine(`[system] Microphone active (${sourceLanguage} -> room target).`, true);
         }
 
@@ -852,6 +905,7 @@
             browserRecognizer = null;
             browserRecognizerRoomId = "";
             stopMicWatchdog();
+            stopMicLevelMeter();
 
             try {
                 await toPromise((ok, fail) => recognizer.stopContinuousRecognitionAsync(ok, fail));
@@ -888,6 +942,93 @@
                 clearInterval(micWatchdogHandle);
                 micWatchdogHandle = null;
             }
+        }
+
+        async function startMicLevelMeter() {
+            if (micMeterAnalyser) {
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024;
+                analyser.smoothingTimeConstant = 0.82;
+
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                micMeterStream = stream;
+                micMeterAudioContext = audioContext;
+                micMeterAnalyser = analyser;
+                micMeterSource = source;
+
+                runMicMeterFrame();
+            } catch (err) {
+                addLine(`[error] Mic meter unavailable: ${err?.message || err}`, true);
+            }
+        }
+
+        function stopMicLevelMeter() {
+            if (micMeterFrameHandle !== null) {
+                cancelAnimationFrame(micMeterFrameHandle);
+                micMeterFrameHandle = null;
+            }
+
+            if (micMeterSource) {
+                try {
+                    micMeterSource.disconnect();
+                } catch {
+                    // Ignore disconnect errors.
+                }
+                micMeterSource = null;
+            }
+
+            if (micMeterStream) {
+                for (const track of micMeterStream.getTracks()) {
+                    track.stop();
+                }
+                micMeterStream = null;
+            }
+
+            if (micMeterAudioContext) {
+                micMeterAudioContext.close().catch(() => {
+                    // Ignore close errors.
+                });
+                micMeterAudioContext = null;
+            }
+
+            micMeterAnalyser = null;
+            setMicLevel(0);
+        }
+
+        function runMicMeterFrame() {
+            if (!micMeterAnalyser) {
+                setMicLevel(0);
+                return;
+            }
+
+            const bufferLength = micMeterAnalyser.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+            micMeterAnalyser.getByteTimeDomainData(dataArray);
+
+            let sumSquares = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const centered = (dataArray[i] - 128) / 128;
+                sumSquares += centered * centered;
+            }
+
+            const rms = Math.sqrt(sumSquares / bufferLength);
+            const percent = Math.max(0, Math.min(100, Math.round(rms * 240)));
+            setMicLevel(percent);
+
+            micMeterFrameHandle = requestAnimationFrame(runMicMeterFrame);
+        }
+
+        function setMicLevel(percent) {
+            micLevelFillEl.style.width = `${percent}%`;
+            micLevelValueEl.textContent = `${percent}%`;
         }
 
         function publishRecognitionResult(sourceLanguage, isFinal, result) {
@@ -962,6 +1103,8 @@
         async function stopRoom(roomId, reason = "manual") {
             if (browserRecognizerRoomId === roomId) {
                 await stopBrowserRecognition();
+            } else {
+                stopMicLevelMeter();
             }
 
             const reasonParam = encodeURIComponent((reason || "manual").trim());
