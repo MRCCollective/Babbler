@@ -912,13 +912,24 @@
         }
 
         function getSelectedMicDeviceId() {
-            const value = (micInputEl.value || "").trim();
-            return value || "";
+            return normalizeMicDeviceId(micInputEl.value);
         }
 
         function getSelectedMicLabel() {
             const option = micInputEl.options[micInputEl.selectedIndex];
             return option?.textContent?.trim() || "Default microphone";
+        }
+
+        function normalizeMicDeviceId(value) {
+            const normalized = (value || "").trim();
+            if (!normalized ||
+                normalized.toLowerCase() === "default" ||
+                normalized.toLowerCase() === "communications")
+            {
+                return "";
+            }
+
+            return normalized;
         }
 
         async function refreshMicrophoneDevices(preserveSelection) {
@@ -935,18 +946,25 @@
 
             const previousValue = preserveSelection ? getSelectedMicDeviceId() : "";
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const microphones = devices.filter(device => device.kind === "audioinput");
+            const defaultDevice = devices.find(device =>
+                device.kind === "audioinput" &&
+                (device.deviceId || "").toLowerCase() === "default");
+            const microphones = devices.filter(device =>
+                device.kind === "audioinput" &&
+                normalizeMicDeviceId(device.deviceId));
 
             micInputEl.innerHTML = "";
 
             const defaultOption = document.createElement("option");
             defaultOption.value = "";
-            defaultOption.textContent = "System default microphone";
+            defaultOption.textContent = defaultDevice?.label
+                ? `Default - ${defaultDevice.label}`
+                : "System default microphone";
             micInputEl.appendChild(defaultOption);
 
             microphones.forEach((device, index) => {
                 const option = document.createElement("option");
-                option.value = device.deviceId || "";
+                option.value = normalizeMicDeviceId(device.deviceId);
                 option.textContent = device.label || `Microphone ${index + 1}`;
                 micInputEl.appendChild(option);
             });
@@ -1009,6 +1027,26 @@
 
             recognizer.sessionStopped = () => {
                 addLine("[system] Speech session stopped.", true);
+
+                if (!browserRecognizer || browserRecognizerRoomId !== roomId) {
+                    return;
+                }
+
+                const now = Date.now();
+                if (recognizerRestartInProgress || now - lastRecognizerRestartAt < 4000) {
+                    return;
+                }
+
+                lastRecognizerRestartAt = now;
+                recognizerRestartInProgress = true;
+                addLine("[system] Restarting microphone recognition after unexpected session stop...", true);
+                startBrowserRecognition(roomId, sourceLanguage).then(() => {
+                    addLine("[system] Microphone recognition restarted.", true);
+                }).catch(err => {
+                    addLine(`[error] Auto-restart after session stop failed: ${err?.message || err}`, true);
+                }).finally(() => {
+                    recognizerRestartInProgress = false;
+                });
             };
 
             recognizer.canceled = (_, event) => {
