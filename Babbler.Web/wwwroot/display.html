@@ -172,6 +172,9 @@
 
         connection.on("translationUpdate", data => {
             if (data.systemMessage) {
+                subtitleEl.classList.remove("fade-out");
+                subtitleEl.textContent = data.systemMessage;
+                timeEl.textContent = new Date(data.timestampUtc || Date.now()).toLocaleTimeString();
                 return;
             }
 

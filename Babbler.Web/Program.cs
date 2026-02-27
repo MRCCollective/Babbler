@@ -40,9 +40,38 @@ app.Use(async (context, next) =>
 });
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.Value?.EndsWith(".html", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            context.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate, max-age=0";
+            context.Context.Response.Headers.Pragma = "no-cache";
+            context.Context.Response.Headers.Expires = "0";
+        }
+    }
+});
 
 app.MapHub<TranslationHub>("/hubs/translation");
+
+app.MapGet("/api/diag", async (
+    IHostEnvironment environment,
+    TranslationSessionService session,
+    CancellationToken cancellationToken) =>
+{
+    var rooms = await session.GetRoomsAsync(cancellationToken);
+    var running = rooms.Count(room => room.IsRunning);
+    return Results.Ok(new
+    {
+        utcNow = DateTimeOffset.UtcNow,
+        environment = environment.EnvironmentName,
+        version = typeof(Program).Assembly.GetName().Version?.ToString(),
+        roomsCount = rooms.Count,
+        runningRoomsCount = running,
+        roomIds = rooms.Select(room => room.RoomId).Take(12).ToArray()
+    });
+});
 
 app.MapGet("/api/speech/token", async (
     TranslationSessionService session,

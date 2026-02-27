@@ -423,6 +423,7 @@
         let currentJoinUrl = "";
         let statusPollHandle = null;
         let roomPollHandle = null;
+        let diagPollHandle = null;
         let connection = null;
         let freeLimitReached = false;
         let browserRecognizer = null;
@@ -1049,6 +1050,26 @@
             }
         }
 
+        async function refreshDiagnostics() {
+            const response = await fetchJson("/api/diag");
+            if (!response.ok || !response.data) {
+                throw new Error(response.errorMessage || "Diagnostics unavailable.");
+            }
+
+            const diag = response.data;
+            const roomSummary = `rooms=${diag.roomsCount ?? "?"}, running=${diag.runningRoomsCount ?? "?"}`;
+            const version = diag.version || "n/a";
+            addLine(`[system] diag: env=${diag.environment || "?"}, version=${version}, ${roomSummary}`, true);
+        }
+
+        async function refreshDiagnosticsSafe() {
+            try {
+                await refreshDiagnostics();
+            } catch {
+                // Ignore diagnostic poll errors.
+            }
+        }
+
         function isRoomNotFoundError(message) {
             return (message || "").toLowerCase().includes("not found");
         }
@@ -1100,8 +1121,16 @@
         async function init() {
             await ensureRoom();
             await refreshRoomsSafe();
+            await refreshDiagnosticsSafe();
             startStatusPolling();
             startRoomPolling();
+
+            if (diagPollHandle !== null) {
+                clearInterval(diagPollHandle);
+            }
+            diagPollHandle = setInterval(async () => {
+                await refreshDiagnosticsSafe();
+            }, 30000);
         }
 
         init().catch(err => addLine(`[error] ${err.message}`, true));
