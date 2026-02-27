@@ -519,11 +519,13 @@
         let micActivityBoost = 0;
         let selectedMicDeviceId = "";
         let currentRecognitionDeviceId = "";
+        let currentRecognitionLanguage = "";
         let micSwitchInProgress = false;
         let recognizerRestartInProgress = false;
         let lastRecognizerRestartAt = 0;
         let micNoSpeechRecoveryInProgress = false;
         let lastMicAutoFallbackAt = 0;
+        let sourceLanguageAutoFallbackUsed = false;
         let lastRoomDiagStateSignature = "";
         let lastRoomDiagWarningAt = 0;
         const signalRClient = window.signalR;
@@ -627,6 +629,16 @@
                 });
             });
         }
+
+        document.addEventListener("visibilitychange", () => {
+            if (!browserRecognizer) {
+                return;
+            }
+
+            if (document.hidden) {
+                addLine("[system] Control tab is in background. Keep this tab active while capturing microphone.", true);
+            }
+        });
 
         newRoomBtn.addEventListener("click", async () => {
             newRoomBtn.disabled = true;
@@ -1088,6 +1100,18 @@
             });
         }
 
+        function getSourceLanguageFallback(sourceLanguage) {
+            if (sourceLanguage === "en-US") {
+                return "sv-SE";
+            }
+
+            if (sourceLanguage === "sv-SE") {
+                return "en-US";
+            }
+
+            return "";
+        }
+
         async function startBrowserRecognition(roomId, sourceLanguage) {
             if (!connection) {
                 throw new Error("SignalR connection is not ready.");
@@ -1155,6 +1179,7 @@
             browserRecognizer = recognizer;
             browserRecognizerRoomId = roomId;
             currentRecognitionDeviceId = activeDeviceId;
+            currentRecognitionLanguage = sourceLanguage;
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
@@ -1173,6 +1198,7 @@
             if (!browserRecognizer) {
                 browserRecognizerRoomId = "";
                 currentRecognitionDeviceId = "";
+                currentRecognitionLanguage = "";
                 stopMicActivityAnimation();
                 if (restartMeter) {
                     await startMicLevelMeter(getSelectedMicDeviceId());
@@ -1184,6 +1210,7 @@
             browserRecognizer = null;
             browserRecognizerRoomId = "";
             currentRecognitionDeviceId = "";
+            currentRecognitionLanguage = "";
             stopMicWatchdog();
             stopMicActivityAnimation();
             stopMicLevelMeter();
@@ -1218,6 +1245,29 @@
 
                 lastMicWarningAt = now;
                 addLine("[error] No speech detected from microphone yet. Check browser mic input device and site permission.", true);
+
+                if (!sourceLanguageAutoFallbackUsed &&
+                    now - lastMicActivityAt >= 20000 &&
+                    browserRecognizerRoomId &&
+                    !recognizerRestartInProgress)
+                {
+                    const fallbackLanguage = getSourceLanguageFallback(currentRecognitionLanguage);
+                    if (fallbackLanguage) {
+                        sourceLanguageAutoFallbackUsed = true;
+                        sourceLanguageEl.value = fallbackLanguage;
+                        addLine(
+                            `[system] No speech recognized. Trying source language ${fallbackLanguage}.`,
+                            true);
+                        startBrowserRecognition(browserRecognizerRoomId, fallbackLanguage)
+                            .then(() => {
+                                addLine("[system] Source language fallback applied.", true);
+                            })
+                            .catch(err => {
+                                addLine(`[error] Source language fallback failed: ${err?.message || err}`, true);
+                            });
+                        return;
+                    }
+                }
 
                 if (now - lastMicActivityAt < 25000) {
                     return;
@@ -1440,6 +1490,7 @@
             if (roomId !== currentRoomId) {
                 await switchRoom(roomId);
             }
+            sourceLanguageAutoFallbackUsed = false;
 
             const payload = {
                 sourceLanguage: sourceLanguageEl.value
