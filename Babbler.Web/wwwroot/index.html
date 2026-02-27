@@ -428,6 +428,9 @@
         let freeLimitReached = false;
         let browserRecognizer = null;
         let browserRecognizerRoomId = "";
+        let micWatchdogHandle = null;
+        let lastMicActivityAt = 0;
+        let lastMicWarningAt = 0;
         let roomRecoveryInProgress = false;
         let lastPublishErrorAt = 0;
         const signalRClient = window.signalR;
@@ -797,10 +800,17 @@
                 speechSdk.AudioConfig.fromDefaultMicrophoneInput());
 
             recognizer.recognizing = (_, event) => {
+                if (event?.result?.text) {
+                    lastMicActivityAt = Date.now();
+                }
                 publishRecognitionResult(sourceLanguage, false, event?.result);
             };
 
             recognizer.recognized = (_, event) => {
+                if (event?.result?.text) {
+                    lastMicActivityAt = Date.now();
+                    addLine(`[mic-final] ${event.result.text}`);
+                }
                 publishRecognitionResult(sourceLanguage, true, event?.result);
             };
 
@@ -826,6 +836,9 @@
 
             browserRecognizer = recognizer;
             browserRecognizerRoomId = roomId;
+            lastMicActivityAt = Date.now();
+            lastMicWarningAt = 0;
+            startMicWatchdog();
             addLine(`[system] Microphone active (${sourceLanguage} -> room target).`, true);
         }
 
@@ -838,6 +851,7 @@
             const recognizer = browserRecognizer;
             browserRecognizer = null;
             browserRecognizerRoomId = "";
+            stopMicWatchdog();
 
             try {
                 await toPromise((ok, fail) => recognizer.stopContinuousRecognitionAsync(ok, fail));
@@ -846,6 +860,34 @@
             }
 
             recognizer.close();
+        }
+
+        function startMicWatchdog() {
+            stopMicWatchdog();
+            micWatchdogHandle = setInterval(() => {
+                if (!browserRecognizer) {
+                    return;
+                }
+
+                const now = Date.now();
+                if (now - lastMicActivityAt < 15000) {
+                    return;
+                }
+
+                if (now - lastMicWarningAt < 15000) {
+                    return;
+                }
+
+                lastMicWarningAt = now;
+                addLine("[error] No speech detected from microphone yet. Check browser mic input device and site permission.", true);
+            }, 5000);
+        }
+
+        function stopMicWatchdog() {
+            if (micWatchdogHandle !== null) {
+                clearInterval(micWatchdogHandle);
+                micWatchdogHandle = null;
+            }
         }
 
         function publishRecognitionResult(sourceLanguage, isFinal, result) {
