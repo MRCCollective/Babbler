@@ -564,6 +564,7 @@
         let lastRoomDiagWarningAt = 0;
         let startRoomInProgress = false;
         let recognizerActionQueue = Promise.resolve();
+        let wasHiddenDuringCapture = false;
         let publishAttemptCount = 0;
         let publishSuccessCount = 0;
         let publishFailureCount = 0;
@@ -684,9 +685,25 @@
             }
 
             if (document.hidden) {
+                wasHiddenDuringCapture = true;
                 addLine("[system] Control tab is in background. Keep this tab active while capturing microphone.", true);
                 addDebugLine("visibility change: hidden while recognizer active", "warn");
+                return;
             }
+
+            if (!wasHiddenDuringCapture) {
+                return;
+            }
+
+            wasHiddenDuringCapture = false;
+            const roomId = browserRecognizerRoomId;
+            const sourceLanguage = currentRecognitionLanguage || sourceLanguageEl.value;
+            addLine("[system] Control tab active again. Restarting microphone capture.", true);
+            addDebugLine("visibility change: visible; restarting recognizer");
+            startBrowserRecognition(roomId, sourceLanguage).catch(err => {
+                addLine(`[error] Unable to resume microphone capture: ${err?.message || err}`, true);
+                addDebugLine(`resume after visibility failed: ${err?.message || err}`, "error");
+            });
         });
 
         newRoomBtn.addEventListener("click", async () => {
@@ -1623,6 +1640,12 @@
                 if (roomId !== currentRoomId) {
                     await switchRoom(roomId);
                 }
+
+                if (document.hidden) {
+                    throw new Error("Control tab must stay visible when starting microphone capture.");
+                }
+
+                await ensureMicrophonePermission();
                 sourceLanguageAutoFallbackUsed = false;
 
                 const payload = {
@@ -1776,6 +1799,8 @@
             }
 
             window.open(`/join.html?roomId=${encodeURIComponent(roomId)}`, "_blank");
+            addLine("[system] Display opened. Keep this control tab in foreground while speaking.", true);
+            addDebugLine("open display requested");
         }
 
         function startStatusPolling() {
