@@ -514,6 +514,9 @@
         let micMeterAnalyser = null;
         let micMeterSource = null;
         let micMeterFrameHandle = null;
+        let micActivityFrameHandle = null;
+        let micActivityAnimationEnabled = false;
+        let micActivityBoost = 0;
         let selectedMicDeviceId = "";
         let currentRecognitionDeviceId = "";
         let micSwitchInProgress = false;
@@ -1013,6 +1016,7 @@
             recognizer.recognizing = (_, event) => {
                 if (event?.result?.text) {
                     lastMicActivityAt = Date.now();
+                    noteMicSpeechActivity(false);
                 }
                 publishRecognitionResult(sourceLanguage, false, event?.result);
             };
@@ -1020,6 +1024,7 @@
             recognizer.recognized = (_, event) => {
                 if (event?.result?.text) {
                     lastMicActivityAt = Date.now();
+                    noteMicSpeechActivity(true);
                     addLine(`[mic-final] ${event.result.text}`);
                 }
                 publishRecognitionResult(sourceLanguage, true, event?.result);
@@ -1153,14 +1158,14 @@
             lastMicActivityAt = Date.now();
             lastMicWarningAt = 0;
             startMicWatchdog();
+            startMicActivityAnimation();
             await refreshMicrophoneDevices(true);
             if (activeDeviceId &&
                 Array.from(micInputEl.options).some(option => option.value === activeDeviceId))
             {
                 micInputEl.value = activeDeviceId;
             }
-            setMicLevel(0);
-            addLine("[system] Mic level meter paused during active translation for device compatibility.", true);
+            addLine("[system] Mic activity animation enabled during active translation.", true);
             addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
         }
 
@@ -1168,6 +1173,7 @@
             if (!browserRecognizer) {
                 browserRecognizerRoomId = "";
                 currentRecognitionDeviceId = "";
+                stopMicActivityAnimation();
                 if (restartMeter) {
                     await startMicLevelMeter(getSelectedMicDeviceId());
                 }
@@ -1179,6 +1185,7 @@
             browserRecognizerRoomId = "";
             currentRecognitionDeviceId = "";
             stopMicWatchdog();
+            stopMicActivityAnimation();
             stopMicLevelMeter();
 
             try {
@@ -1262,6 +1269,8 @@
             if (micMeterAnalyser) {
                 return;
             }
+
+            stopMicActivityAnimation(false);
 
             try {
                 const audioConstraint = deviceId
@@ -1348,6 +1357,46 @@
             setMicLevel(percent);
 
             micMeterFrameHandle = requestAnimationFrame(runMicMeterFrame);
+        }
+
+        function noteMicSpeechActivity(isStrong) {
+            micActivityBoost = Math.max(micActivityBoost, isStrong ? 1 : 0.7);
+        }
+
+        function startMicActivityAnimation() {
+            stopMicActivityAnimation(false);
+            micActivityAnimationEnabled = true;
+            micActivityBoost = 0;
+
+            const tick = () => {
+                if (!micActivityAnimationEnabled) {
+                    return;
+                }
+
+                const now = Date.now();
+                const baseline = 10 + ((Math.sin(now / 190) + 1) * 6);
+                micActivityBoost *= 0.92;
+                const boost = micActivityBoost * 78;
+                const percent = Math.max(baseline, Math.min(100, Math.round(baseline + boost)));
+                setMicLevel(percent);
+                micActivityFrameHandle = requestAnimationFrame(tick);
+            };
+
+            tick();
+        }
+
+        function stopMicActivityAnimation(resetMeter = true) {
+            micActivityAnimationEnabled = false;
+            micActivityBoost = 0;
+
+            if (micActivityFrameHandle !== null) {
+                cancelAnimationFrame(micActivityFrameHandle);
+                micActivityFrameHandle = null;
+            }
+
+            if (resetMeter) {
+                setMicLevel(0);
+            }
         }
 
         function setMicLevel(percent) {
