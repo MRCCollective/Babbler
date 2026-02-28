@@ -62,12 +62,14 @@ app.MapGet("/api/diag", async (
 {
     var rooms = await session.GetRoomsAsync(cancellationToken);
     var running = rooms.Count(room => room.IsRunning);
+    var retainedStopped = rooms.Count - running;
     return Results.Ok(new
     {
         utcNow = DateTimeOffset.UtcNow,
         environment = environment.EnvironmentName,
         version = typeof(Program).Assembly.GetName().Version?.ToString(),
-        roomsCount = rooms.Count,
+        roomsCount = running,
+        retainedRoomsCount = retainedStopped,
         runningRoomsCount = running,
         roomIds = rooms.Select(room => room.RoomId).Take(12).ToArray()
     });

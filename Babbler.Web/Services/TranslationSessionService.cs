@@ -14,6 +14,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
 {
     private const string DefaultTargetLanguage = "en";
     private const string AccessCookiePrefix = "babbler_display_access_";
+    private static readonly TimeSpan StoppedRoomRetentionWindow = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan UsagePersistInterval = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan UsageMonitorTickInterval = TimeSpan.FromSeconds(1);
     private static readonly string[] SupportedTargetLanguages =
@@ -67,6 +68,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            PruneExpiredStoppedRooms(DateTimeOffset.UtcNow);
             var room = CreateRoomInternal();
             return new RoomAccessInfo(room.RoomId, room.Pin);
         }
@@ -98,6 +100,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            PruneExpiredStoppedRooms(DateTimeOffset.UtcNow);
             return _rooms.Values
                 .OrderByDescending(room => room.IsRunning)
                 .ThenByDescending(room => room.LastStateChangedAtUtc)
@@ -492,6 +495,26 @@ public sealed class TranslationSessionService : IAsyncDisposable
         }
 
         throw new InvalidOperationException($"Room '{normalizedRoomId}' was not found.");
+    }
+
+    private void PruneExpiredStoppedRooms(DateTimeOffset nowUtc)
+    {
+        var cutoffUtc = nowUtc - StoppedRoomRetentionWindow;
+        foreach (var pair in _rooms)
+        {
+            var room = pair.Value;
+            if (room.IsRunning)
+            {
+                continue;
+            }
+
+            if (room.LastStoppedAtUtc is null || room.LastStoppedAtUtc > cutoffUtc)
+            {
+                continue;
+            }
+
+            _rooms.TryRemove(pair.Key, out _);
+        }
     }
 
     private async Task StartRoomInternalAsync(

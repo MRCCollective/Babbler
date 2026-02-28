@@ -1,65 +1,70 @@
 # AGENTS.md
 
-Guidance for coding agents working in this repository.
+Repository guidance for coding agents.
 
 ## Scope
 
-Applies to the entire repo.
+Applies to the full repository.
 
-## Project Overview
+## Architecture Guardrails
 
 - Solution: `Babbler.sln`
-- Web project: `Babbler.Web`
+- Main app: `Babbler.Web`
 - Runtime: `.NET 9`
-- Frontend: static HTML in `Babbler.Web/wwwroot`
-- Realtime transport: SignalR hub at `/hubs/translation`
+- Frontend: static HTML/JS in `Babbler.Web/wwwroot`
+- Realtime transport: SignalR hub `/hubs/translation`
+- Speech recognition happens in browser (Azure Speech JS SDK), not server
 
-## Core Product Behavior (Do Not Break)
+Do not move microphone capture into backend.
 
-- Multi-room support with room IDs and PINs
-- PIN-gated access to `/display.html`
-- Room-specific SignalR groups
-- Browser-side microphone capture from `index.html`
-- Server-side speech token issuance via `/api/speech/token`
-- Monthly free-minute quota enforcement
+## Product Behaviors That Must Not Break
 
-Do not reintroduce server microphone capture in backend services.
+- Multi-room model (room ID + PIN)
+- PIN-gated display access (`/join.html` -> `/display.html`)
+- Room-scoped SignalR updates
+- Room start/stop + target language switching
+- Monthly free-minute usage enforcement
+- Swedish support (`sv`) in supported targets
 
-## Language/Translation Rules
+## Change Discipline
 
-- Keep Swedish support (`sv`) in target languages
-- Preserve existing source language options unless explicitly changed
-- Target language switching must stay room-scoped
+- Keep fixes minimal and reversible.
+- Avoid adding automatic restart/fallback loops unless explicitly requested.
+- If diagnostics are added, keep them low-noise and easy to remove.
+- If user asks to revert behavior, prefer a focused revert commit.
 
-## Security and Secrets
+## Secrets and Config
 
-- Never commit real secrets in `appsettings.json` or `appsettings.Development.json`
-- Use Azure App Settings for production secrets:
+- Never commit real keys.
+- Production secrets must come from App Settings:
   - `Speech__Key`
   - `Speech__Region`
-  - `BitStore__*` if enabled
-- Keep token endpoint short-lived and server-issued
+  - `BitStore__*` (if enabled)
+- `appsettings.json` must stay safe for source control.
 
-## Local Commands
+## Local Workflow
 
 ```powershell
 dotnet build
-dotnet run --project Babbler.Web --urls http://localhost:5091
+dotnet run --project Babbler.Web --launch-profile http
 ```
 
-## Deployment Files
+Local default URL: `http://localhost:5091`
+
+## Deployment Artifacts
 
 - `DEPLOYMENT.md`
+- `.github/workflows/deploy-azure-webapp.yml`
 - `scripts/azure/provision-appservice.ps1`
 - `scripts/azure/deploy-webapp.ps1`
-- `.github/workflows/deploy-azure-webapp.yml`
 
-If deployment behavior changes, update these files together.
+If deployment assumptions change, update all related docs/scripts in the same PR.
 
-## Validation Checklist for Changes
+## Validation Checklist
 
 - `dotnet build` succeeds
-- Room create/start/stop endpoints still work
-- `index.html` can start translation and trigger mic permission prompt
-- `join.html` PIN verification still gates `display.html`
-- SignalR updates still arrive in display clients
+- Room create/select/start/stop works
+- `index.html` requests mic permission on start
+- `join.html` PIN gate works
+- `display.html` receives `translationUpdate` events
+- No regressions in room-scoped behavior
