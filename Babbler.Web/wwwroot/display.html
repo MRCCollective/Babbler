@@ -177,73 +177,6 @@
             line-height: 1.3;
         }
 
-        .tuning-sim {
-            grid-template-columns: 1fr;
-            gap: 0.45rem;
-            border-top: 1px solid rgba(249, 253, 255, 0.12);
-            padding-top: 0.6rem;
-            margin-top: 0.2rem;
-        }
-
-        .sim-text {
-            width: 100%;
-            min-height: 74px;
-            resize: vertical;
-            border: 1px solid rgba(249, 253, 255, 0.2);
-            border-radius: 10px;
-            background: rgba(7, 14, 24, 0.88);
-            color: var(--text);
-            padding: 0.5rem 0.6rem;
-            font-size: 0.8rem;
-            line-height: 1.35;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .sim-controls {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-            align-items: stretch;
-        }
-
-        .sim-controls input[type="range"] {
-            width: 100%;
-        }
-
-        .sim-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-        }
-
-        .sim-label {
-            color: var(--muted);
-            font-size: 0.75rem;
-        }
-
-        .sim-buttons {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            justify-content: flex-start;
-        }
-
-        .sim-btn {
-            border: 1px solid rgba(249, 253, 255, 0.25);
-            color: var(--text);
-            border-radius: 10px;
-            background: rgba(10, 20, 33, 0.84);
-            padding: 0.38rem 0.62rem;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-
-        .sim-btn:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-
         @media (max-width: 760px) {
             .top {
                 flex-direction: column;
@@ -267,14 +200,6 @@
                 text-align: left;
             }
 
-            .sim-controls {
-                grid-template-columns: 1fr;
-            }
-
-            .sim-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
         }
 
         .subtitle {
@@ -283,6 +208,7 @@
             line-height: 1.05;
             font-weight: 700;
             text-wrap: balance;
+            white-space: pre-line;
             text-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
             opacity: 1;
             transition: opacity var(--subtitle-fade-duration, 170ms) ease-out;
@@ -327,8 +253,8 @@
                             <strong>Time Before Disappear</strong>
                             <small>How long subtitle stays before fade begins</small>
                         </div>
-                        <input id="clearIdleDelaySlider" type="range" min="500" max="8000" step="100" value="4000" />
-                        <span id="clearIdleDelayValue" class="tuning-value">4000 ms | Long Read</span>
+                        <input id="clearIdleDelaySlider" type="range" min="500" max="8000" step="100" value="2000" />
+                        <span id="clearIdleDelayValue" class="tuning-value">2000 ms | Readable</span>
                     </div>
                     <div class="tuning-row">
                         <div class="tuning-label">
@@ -344,36 +270,22 @@
                             <small>Show subtitle updates in fixed word blocks</small>
                         </div>
                         <input id="minCommitWordsSlider" type="range" min="1" max="12" step="1" value="4" />
-                        <span id="minCommitWordsValue" class="tuning-value">4 words | Balanced Blocks</span>
+                        <span id="minCommitWordsValue" class="tuning-value">4 words | Balanced Block</span>
+                    </div>
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Max Sentences On Screen</strong>
+                            <small>How many sentence lines stay visible at once</small>
+                        </div>
+                        <input id="maxSentencesSlider" type="range" min="1" max="8" step="1" value="3" />
+                        <span id="maxSentencesValue" class="tuning-value">3 sentences | Balanced</span>
                     </div>
                     <div class="tuning-row tuning-actions">
                         <button id="resetTuningBtn" type="button" class="tuning-reset-btn">Back To Default</button>
                         <span class="tuning-defaults">
-                            Defaults: Delayed Commit 2000 ms, Fadeout 350 ms, Time Before Disappear 4000 ms,
-                            Quiet Gap 800 ms, Words/Commit 4, Simulation Speed 220 ms/word.
+                            Defaults: Delayed Commit 2000 ms, Fadeout 350 ms, Time Before Disappear 2000 ms,
+                            Quiet Gap 800 ms, Words/Commit 4, Max Sentences 3.
                         </span>
-                    </div>
-                    <div class="tuning-row tuning-sim">
-                        <div class="tuning-label">
-                            <strong>Simulate Speech</strong>
-                            <small>Type sample text and play it in a loop until stopped</small>
-                        </div>
-                        <textarea
-                            id="simulateTextInput"
-                            class="sim-text"
-                            placeholder="Paste sample speech here to test tuning..."
-                        >Hello everyone, and welcome to this live translation preview. Today we are testing how subtitle timing feels for a real audience, including short pauses, longer pauses, and natural sentence breaks. The goal is to find a balance where text appears quickly enough to follow the speaker, but stays stable enough to read without distracting jumps. In this section we will speak in a normal tempo, then speed up slightly, and finally slow down again so we can compare the behavior across different rhythms. If the subtitles feel too nervous, increase delayed commit or words per commit; if they feel too slow, reduce those settings until readability and responsiveness feel right.</textarea>
-                        <div class="sim-controls">
-                            <div class="sim-header">
-                                <span class="sim-label">Simulation Speed</span>
-                                <span id="simulateSpeedValue" class="tuning-value">220 ms/word | Natural</span>
-                            </div>
-                            <input id="simulateSpeedSlider" type="range" min="80" max="800" step="20" value="220" />
-                            <div class="sim-buttons">
-                                <button id="simulateStartBtn" type="button" class="sim-btn">Start</button>
-                                <button id="simulateStopBtn" type="button" class="sim-btn" disabled>Stop</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </details>
@@ -405,18 +317,12 @@
     <script>
         const SUPPORTED_TARGET_LANGUAGES = ["en", "sv", "es", "fr", "de", "it", "ja"];
         const TARGET_LANGUAGE_STORAGE_KEY = "babbler_display_target_language";
-        const UPDATE_DELAY_STORAGE_KEY = "babbler_display_update_delay_ms";
-        const FADEOUT_DURATION_STORAGE_KEY = "babbler_display_fadeout_duration_ms";
-        const CLEAR_IDLE_DELAY_STORAGE_KEY = "babbler_display_clear_idle_delay_ms";
-        const NEW_SENTENCE_QUIET_GAP_STORAGE_KEY = "babbler_display_new_sentence_quiet_gap_ms";
-        const MIN_COMMIT_WORDS_STORAGE_KEY = "babbler_display_min_commit_words";
-        const SIMULATION_SPEED_STORAGE_KEY = "babbler_display_simulation_speed_ms";
-        const DEFAULT_CLEAR_IDLE_DELAY_MS = 4000;
+        const DEFAULT_CLEAR_IDLE_DELAY_MS = 2000;
         const DEFAULT_NEW_SENTENCE_QUIET_GAP_MS = 800;
         const DEFAULT_UPDATE_DELAY_MS = 2000;
         const DEFAULT_FADEOUT_DURATION_MS = 350;
         const DEFAULT_MIN_COMMIT_WORDS = 4;
-        const DEFAULT_SIMULATION_SPEED_MS = 220;
+        const DEFAULT_MAX_SENTENCES_ON_SCREEN = 3;
         const MIN_UPDATE_DELAY_MS = 0;
         const MAX_UPDATE_DELAY_MS = 2000;
         const MIN_FADEOUT_DURATION_MS = 100;
@@ -427,8 +333,8 @@
         const MAX_NEW_SENTENCE_QUIET_GAP_MS = 5000;
         const MIN_MIN_COMMIT_WORDS = 1;
         const MAX_MIN_COMMIT_WORDS = 12;
-        const MIN_SIMULATION_SPEED_MS = 80;
-        const MAX_SIMULATION_SPEED_MS = 800;
+        const MIN_MAX_SENTENCES_ON_SCREEN = 1;
+        const MAX_MAX_SENTENCES_ON_SCREEN = 8;
         const subtitleEl = document.getElementById("subtitle");
         const langsEl = document.getElementById("langs");
         const timeEl = document.getElementById("time");
@@ -443,12 +349,9 @@
         const newSentenceQuietGapValueEl = document.getElementById("newSentenceQuietGapValue");
         const minCommitWordsSliderEl = document.getElementById("minCommitWordsSlider");
         const minCommitWordsValueEl = document.getElementById("minCommitWordsValue");
+        const maxSentencesSliderEl = document.getElementById("maxSentencesSlider");
+        const maxSentencesValueEl = document.getElementById("maxSentencesValue");
         const resetTuningBtn = document.getElementById("resetTuningBtn");
-        const simulateTextInputEl = document.getElementById("simulateTextInput");
-        const simulateSpeedSliderEl = document.getElementById("simulateSpeedSlider");
-        const simulateSpeedValueEl = document.getElementById("simulateSpeedValue");
-        const simulateStartBtn = document.getElementById("simulateStartBtn");
-        const simulateStopBtn = document.getElementById("simulateStopBtn");
         const fullscreenBtn = document.getElementById("fullscreenBtn");
         const signalRClient = window.signalR;
         let subtitleClearTimer = null;
@@ -458,10 +361,8 @@
         let pendingSubtitleTimestamp = null;
         let lastSubtitleRenderAt = 0;
         let lastSpeechUpdateAt = 0;
-        let simulationTimer = null;
-        let simulationWords = [];
-        let simulationWordIndex = 0;
-        let simulationRunning = false;
+        let displayedSentences = [];
+        let activeSentenceIndex = -1;
         const roomId = getRoomIdFromQuery();
 
         if (!roomId) {
@@ -527,34 +428,17 @@
             applyTuningSettings();
         });
 
-        simulateSpeedSliderEl.addEventListener("input", () => {
+        maxSentencesSliderEl.addEventListener("input", () => {
             applyTuningSettings();
-            if (simulationRunning) {
-                rescheduleSimulationTick();
-            }
-        });
-
-        simulateStartBtn.addEventListener("click", () => {
-            startSimulation();
-        });
-
-        simulateStopBtn.addEventListener("click", () => {
-            stopSimulation();
         });
 
         resetTuningBtn.addEventListener("click", () => {
             resetTuningToDefaults();
         });
 
-        function handleTranslationUpdate(data, options = {}) {
-            const { fromSimulation = false } = options;
-
+        function handleTranslationUpdate(data) {
             if (data.systemMessage) {
                 showSystemMessage(data.systemMessage, data.timestampUtc);
-                return;
-            }
-
-            if (simulationRunning && !fromSimulation) {
                 return;
             }
 
@@ -569,7 +453,10 @@
                 return;
             }
 
-            if (committedText === pendingSubtitleText || committedText === subtitleEl.textContent) {
+            const activeSentenceText = activeSentenceIndex >= 0 && activeSentenceIndex < displayedSentences.length
+                ? displayedSentences[activeSentenceIndex]
+                : "";
+            if (committedText === pendingSubtitleText || committedText === activeSentenceText) {
                 return;
             }
 
@@ -595,6 +482,8 @@
                 subtitleClearTimer = null;
             }
 
+            displayedSentences = [];
+            activeSentenceIndex = -1;
             subtitleVersion += 1;
             subtitleEl.classList.remove("fade-out");
             subtitleEl.textContent = message;
@@ -650,103 +539,7 @@
             pendingSubtitleTimestamp = null;
         }
 
-        function startSimulation() {
-            const words = splitWords(simulateTextInputEl.value);
-            if (words.length === 0) {
-                showSystemMessage("Enter simulation text first.");
-                return;
-            }
-
-            stopSimulation({ silent: true });
-            startNewSentenceFlow({ clearDisplay: true });
-            lastSpeechUpdateAt = 0;
-
-            simulationWords = words;
-            simulationWordIndex = 0;
-            simulationRunning = true;
-            updateSimulationUiState();
-            runSimulationTick();
-        }
-
-        function runSimulationTick() {
-            if (!simulationRunning || simulationWords.length === 0) {
-                return;
-            }
-
-            simulationWordIndex = Math.min(simulationWords.length, simulationWordIndex + 1);
-            const simulatedText = simulationWords.slice(0, simulationWordIndex).join(" ");
-            const isFinal = simulationWordIndex >= simulationWords.length;
-
-            handleTranslationUpdate({
-                sourceText: simulatedText,
-                translatedText: simulatedText,
-                sourceLanguage: "sim",
-                isFinal,
-                timestampUtc: new Date().toISOString()
-            }, { fromSimulation: true });
-
-            if (isFinal) {
-                simulationWordIndex = 0;
-                lastSpeechUpdateAt = 0;
-                startNewSentenceFlow();
-                scheduleNextSimulationTick(Math.max(getSimulationSpeedMs(), getNewSentenceQuietGapMs()));
-                return;
-            }
-
-            scheduleNextSimulationTick();
-        }
-
-        function scheduleNextSimulationTick(customDelayMs) {
-            if (!simulationRunning) {
-                return;
-            }
-
-            if (simulationTimer !== null) {
-                clearTimeout(simulationTimer);
-            }
-
-            simulationTimer = setTimeout(() => {
-                simulationTimer = null;
-                runSimulationTick();
-            }, Math.max(0, Number.isFinite(customDelayMs) ? customDelayMs : getSimulationSpeedMs()));
-        }
-
-        function rescheduleSimulationTick() {
-            if (!simulationRunning) {
-                return;
-            }
-
-            scheduleNextSimulationTick();
-        }
-
-        function stopSimulation(options = {}) {
-            const { silent = false } = options;
-            const wasRunning = simulationRunning;
-
-            if (simulationTimer !== null) {
-                clearTimeout(simulationTimer);
-                simulationTimer = null;
-            }
-
-            simulationRunning = false;
-            simulationWords = [];
-            simulationWordIndex = 0;
-            lastSpeechUpdateAt = 0;
-            updateSimulationUiState();
-
-            if (wasRunning && !silent) {
-                showSystemMessage("Simulation stopped.");
-            }
-        }
-
-        function updateSimulationUiState() {
-            simulateStartBtn.disabled = simulationRunning;
-            simulateStopBtn.disabled = !simulationRunning;
-            simulateTextInputEl.disabled = simulationRunning;
-        }
-
-        function startNewSentenceFlow(options = {}) {
-            const { clearDisplay = false } = options;
+        function startNewSentenceFlow() {
             clearPendingSubtitleQueue();
 
             if (subtitleClearTimer !== null) {
@@ -756,16 +549,27 @@
 
             subtitleVersion += 1;
             subtitleEl.classList.remove("fade-out");
-            if (clearDisplay) {
-                subtitleEl.textContent = "";
-            }
+            activeSentenceIndex = -1;
         }
 
         function showSubtitle(text) {
             subtitleVersion += 1;
             const currentVersion = subtitleVersion;
             subtitleEl.classList.remove("fade-out");
-            subtitleEl.textContent = text;
+            const normalizedText = (text || "").trim();
+            if (!normalizedText) {
+                return;
+            }
+
+            if (activeSentenceIndex < 0 || activeSentenceIndex >= displayedSentences.length) {
+                displayedSentences.push(normalizedText);
+                activeSentenceIndex = displayedSentences.length - 1;
+            } else {
+                displayedSentences[activeSentenceIndex] = normalizedText;
+            }
+
+            trimDisplayedSentences(getMaxSentencesOnScreen());
+            subtitleEl.textContent = displayedSentences.join("\n");
 
             if (subtitleClearTimer !== null) {
                 clearTimeout(subtitleClearTimer);
@@ -788,6 +592,8 @@
                     return;
                 }
 
+                displayedSentences = [];
+                activeSentenceIndex = -1;
                 subtitleEl.textContent = "";
             }, fadeDurationMs);
         }
@@ -859,38 +665,13 @@
         }
 
         function initTuningControls() {
-            updateDelaySliderEl.value = readStoredTuningValue(
-                UPDATE_DELAY_STORAGE_KEY,
-                DEFAULT_UPDATE_DELAY_MS,
-                MIN_UPDATE_DELAY_MS,
-                MAX_UPDATE_DELAY_MS).toString();
-            fadeoutDurationSliderEl.value = readStoredTuningValue(
-                FADEOUT_DURATION_STORAGE_KEY,
-                DEFAULT_FADEOUT_DURATION_MS,
-                MIN_FADEOUT_DURATION_MS,
-                MAX_FADEOUT_DURATION_MS).toString();
-            clearIdleDelaySliderEl.value = readStoredTuningValue(
-                CLEAR_IDLE_DELAY_STORAGE_KEY,
-                DEFAULT_CLEAR_IDLE_DELAY_MS,
-                MIN_CLEAR_IDLE_DELAY_MS,
-                MAX_CLEAR_IDLE_DELAY_MS).toString();
-            newSentenceQuietGapSliderEl.value = readStoredTuningValue(
-                NEW_SENTENCE_QUIET_GAP_STORAGE_KEY,
-                DEFAULT_NEW_SENTENCE_QUIET_GAP_MS,
-                MIN_NEW_SENTENCE_QUIET_GAP_MS,
-                MAX_NEW_SENTENCE_QUIET_GAP_MS).toString();
-            minCommitWordsSliderEl.value = readStoredTuningValue(
-                MIN_COMMIT_WORDS_STORAGE_KEY,
-                DEFAULT_MIN_COMMIT_WORDS,
-                MIN_MIN_COMMIT_WORDS,
-                MAX_MIN_COMMIT_WORDS).toString();
-            simulateSpeedSliderEl.value = readStoredTuningValue(
-                SIMULATION_SPEED_STORAGE_KEY,
-                DEFAULT_SIMULATION_SPEED_MS,
-                MIN_SIMULATION_SPEED_MS,
-                MAX_SIMULATION_SPEED_MS).toString();
+            updateDelaySliderEl.value = DEFAULT_UPDATE_DELAY_MS.toString();
+            fadeoutDurationSliderEl.value = DEFAULT_FADEOUT_DURATION_MS.toString();
+            clearIdleDelaySliderEl.value = DEFAULT_CLEAR_IDLE_DELAY_MS.toString();
+            newSentenceQuietGapSliderEl.value = DEFAULT_NEW_SENTENCE_QUIET_GAP_MS.toString();
+            minCommitWordsSliderEl.value = DEFAULT_MIN_COMMIT_WORDS.toString();
+            maxSentencesSliderEl.value = DEFAULT_MAX_SENTENCES_ON_SCREEN.toString();
             applyTuningSettings();
-            updateSimulationUiState();
         }
 
         function resetTuningToDefaults() {
@@ -899,7 +680,7 @@
             clearIdleDelaySliderEl.value = DEFAULT_CLEAR_IDLE_DELAY_MS.toString();
             newSentenceQuietGapSliderEl.value = DEFAULT_NEW_SENTENCE_QUIET_GAP_MS.toString();
             minCommitWordsSliderEl.value = DEFAULT_MIN_COMMIT_WORDS.toString();
-            simulateSpeedSliderEl.value = DEFAULT_SIMULATION_SPEED_MS.toString();
+            maxSentencesSliderEl.value = DEFAULT_MAX_SENTENCES_ON_SCREEN.toString();
             applyTuningSettings();
         }
 
@@ -909,34 +690,31 @@
             const clearIdleDelayMs = getClearIdleDelayMs();
             const newSentenceQuietGapMs = getNewSentenceQuietGapMs();
             const commitChunkWords = getCommitChunkWords();
-            const simulationSpeedMs = getSimulationSpeedMs();
+            const maxSentencesOnScreen = getMaxSentencesOnScreen();
             const delayDescriptor = describeUpdateDelay(updateDelayMs);
             const fadeDescriptor = describeFadeoutDuration(fadeoutDurationMs);
             const clearIdleDescriptor = describeClearIdleDelay(clearIdleDelayMs);
             const newSentenceDescriptor = describeNewSentenceQuietGap(newSentenceQuietGapMs);
             const wordsPerCommitDescriptor = describeWordsPerCommit(commitChunkWords);
-            const simulationSpeedDescriptor = describeSimulationSpeed(simulationSpeedMs);
+            const maxSentencesDescriptor = describeMaxSentencesOnScreen(maxSentencesOnScreen);
 
             updateDelaySliderEl.value = updateDelayMs.toString();
             fadeoutDurationSliderEl.value = fadeoutDurationMs.toString();
             clearIdleDelaySliderEl.value = clearIdleDelayMs.toString();
             newSentenceQuietGapSliderEl.value = newSentenceQuietGapMs.toString();
             minCommitWordsSliderEl.value = commitChunkWords.toString();
-            simulateSpeedSliderEl.value = simulationSpeedMs.toString();
+            maxSentencesSliderEl.value = maxSentencesOnScreen.toString();
             updateDelayValueEl.textContent = `${updateDelayMs} ms | ${delayDescriptor}`;
             fadeoutDurationValueEl.textContent = `${fadeoutDurationMs} ms | ${fadeDescriptor}`;
             clearIdleDelayValueEl.textContent = `${clearIdleDelayMs} ms | ${clearIdleDescriptor}`;
             newSentenceQuietGapValueEl.textContent = `${newSentenceQuietGapMs} ms | ${newSentenceDescriptor}`;
             minCommitWordsValueEl.textContent = `${commitChunkWords} words | ${wordsPerCommitDescriptor}`;
-            simulateSpeedValueEl.textContent = `${simulationSpeedMs} ms/word | ${simulationSpeedDescriptor}`;
+            maxSentencesValueEl.textContent = `${maxSentencesOnScreen} ${maxSentencesOnScreen === 1 ? "sentence" : "sentences"} | ${maxSentencesDescriptor}`;
             subtitleEl.style.setProperty("--subtitle-fade-duration", `${fadeoutDurationMs}ms`);
-
-            localStorage.setItem(UPDATE_DELAY_STORAGE_KEY, updateDelayMs.toString());
-            localStorage.setItem(FADEOUT_DURATION_STORAGE_KEY, fadeoutDurationMs.toString());
-            localStorage.setItem(CLEAR_IDLE_DELAY_STORAGE_KEY, clearIdleDelayMs.toString());
-            localStorage.setItem(NEW_SENTENCE_QUIET_GAP_STORAGE_KEY, newSentenceQuietGapMs.toString());
-            localStorage.setItem(MIN_COMMIT_WORDS_STORAGE_KEY, commitChunkWords.toString());
-            localStorage.setItem(SIMULATION_SPEED_STORAGE_KEY, simulationSpeedMs.toString());
+            trimDisplayedSentences(maxSentencesOnScreen);
+            if (displayedSentences.length > 0) {
+                subtitleEl.textContent = displayedSentences.join("\n");
+            }
 
             if (subtitleUpdateTimer !== null && pendingSubtitleText) {
                 clearTimeout(subtitleUpdateTimer);
@@ -974,9 +752,13 @@
             return clampNumber(numeric, MIN_MIN_COMMIT_WORDS, MAX_MIN_COMMIT_WORDS, DEFAULT_MIN_COMMIT_WORDS);
         }
 
-        function getSimulationSpeedMs() {
-            const numeric = Number(simulateSpeedSliderEl.value);
-            return clampNumber(numeric, MIN_SIMULATION_SPEED_MS, MAX_SIMULATION_SPEED_MS, DEFAULT_SIMULATION_SPEED_MS);
+        function getMaxSentencesOnScreen() {
+            const numeric = Number(maxSentencesSliderEl.value);
+            return clampNumber(
+                numeric,
+                MIN_MAX_SENTENCES_ON_SCREEN,
+                MAX_MAX_SENTENCES_ON_SCREEN,
+                DEFAULT_MAX_SENTENCES_ON_SCREEN);
         }
 
         function describeUpdateDelay(valueMs) {
@@ -1053,7 +835,7 @@
             }
 
             if (wordCount <= 4) {
-                return "Balanced Blocks";
+                return "Balanced Block";
             }
 
             if (wordCount <= 7) {
@@ -1063,20 +845,20 @@
             return "Very Large Blocks";
         }
 
-        function describeSimulationSpeed(valueMs) {
-            if (valueMs <= 160) {
-                return "Very Fast";
+        function describeMaxSentencesOnScreen(sentenceCount) {
+            if (sentenceCount <= 2) {
+                return "Compact";
             }
 
-            if (valueMs <= 280) {
-                return "Natural";
+            if (sentenceCount <= 4) {
+                return "Balanced";
             }
 
-            if (valueMs <= 460) {
-                return "Measured";
+            if (sentenceCount <= 6) {
+                return "Expanded";
             }
 
-            return "Slow";
+            return "Dense";
         }
 
         function buildCommittedSubtitleText(text, isFinal) {
@@ -1119,9 +901,20 @@
             return normalized.split(/\s+/).filter(Boolean);
         }
 
-        function readStoredTuningValue(storageKey, fallback, min, max) {
-            const numeric = Number(localStorage.getItem(storageKey));
-            return clampNumber(numeric, min, max, fallback);
+        function trimDisplayedSentences(maxSentences) {
+            const safeMax = Math.max(1, maxSentences || 1);
+            while (displayedSentences.length > safeMax) {
+                displayedSentences.shift();
+                activeSentenceIndex -= 1;
+            }
+
+            if (activeSentenceIndex < -1) {
+                activeSentenceIndex = -1;
+            }
+
+            if (activeSentenceIndex >= displayedSentences.length) {
+                activeSentenceIndex = displayedSentences.length - 1;
+            }
         }
 
         function clampNumber(value, min, max, fallback) {
