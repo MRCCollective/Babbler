@@ -17,6 +17,27 @@ builder.Services.AddSingleton<TranslationSessionService>();
 
 var app = builder.Build();
 
+var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+var webSocketsFlag = Environment.GetEnvironmentVariable("WEBSITES_WEB_SOCKET_ENABLED");
+if (!string.IsNullOrWhiteSpace(webSocketsFlag) &&
+    !string.Equals(webSocketsFlag, "true", StringComparison.OrdinalIgnoreCase) &&
+    !string.Equals(webSocketsFlag, "1", StringComparison.OrdinalIgnoreCase))
+{
+    startupLogger.LogWarning(
+        "WEBSITES_WEB_SOCKET_ENABLED={WebSocketsFlag}. Enable WebSockets in App Service for best SignalR reliability.",
+        webSocketsFlag);
+}
+
+var speechKeyConfigured = !string.IsNullOrWhiteSpace(builder.Configuration[$"{SpeechOptions.SectionName}:Key"]);
+var speechRegionConfigured = !string.IsNullOrWhiteSpace(builder.Configuration[$"{SpeechOptions.SectionName}:Region"]);
+if (!speechKeyConfigured || !speechRegionConfigured)
+{
+    startupLogger.LogWarning(
+        "Speech configuration incomplete at startup. keyConfigured={KeyConfigured}, regionConfigured={RegionConfigured}",
+        speechKeyConfigured,
+        speechRegionConfigured);
+}
+
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.Equals("/display.html", StringComparison.OrdinalIgnoreCase))
@@ -70,6 +91,34 @@ app.MapGet("/api/diag", async (
         roomsCount = rooms.Count,
         runningRoomsCount = running,
         roomIds = rooms.Select(room => room.RoomId).Take(12).ToArray()
+    });
+});
+
+app.MapGet("/api/infra", (HttpContext context) =>
+{
+    static string? GetEnv(string key) => Environment.GetEnvironmentVariable(key);
+
+    var arrCookiePresent =
+        context.Request.Cookies.ContainsKey("ARRAffinity") ||
+        context.Request.Cookies.ContainsKey("ARRAffinitySameSite");
+    var webSocketsEnabled = GetEnv("WEBSITES_WEB_SOCKET_ENABLED");
+    var instanceId = GetEnv("WEBSITE_INSTANCE_ID");
+    var siteName = GetEnv("WEBSITE_SITE_NAME");
+    var sku = GetEnv("WEBSITE_SKU");
+
+    return Results.Ok(new
+    {
+        utcNow = DateTimeOffset.UtcNow,
+        webSocketsEnabled,
+        arrAffinityCookiePresent = arrCookiePresent,
+        instanceId,
+        siteName,
+        sku,
+        hints = new[]
+        {
+            "If WebSockets is disabled, enable it in App Service Configuration > General settings.",
+            "If scaling above one instance, use Azure SignalR Service or sticky affinity may still break rooms."
+        }
     });
 });
 

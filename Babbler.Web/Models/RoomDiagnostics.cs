@@ -12,6 +12,12 @@ public sealed record RoomDiagnostics(
     string? LastClientSourceText,
     string? LastClientTranslatedText,
     int ActiveHubConnections,
+    DateTimeOffset? LastClientPayloadReceivedAtUtc,
+    long ClientPayloadsReceived,
+    long ClientPayloadsForwarded,
+    long ClientPayloadsDroppedNotRunning,
+    long ClientPayloadsDroppedEmpty,
+    long ClientPayloadSendErrors,
     double FreeMinutesUsed,
     double FreeMinutesRemaining,
     DateTimeOffset SnapshotUtc);

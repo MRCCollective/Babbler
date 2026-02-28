@@ -109,6 +109,16 @@
             justify-content: space-between;
             color: var(--muted);
             font-size: 0.95rem;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .debug-state {
+            flex: 1 1 180px;
+            text-align: right;
+            opacity: 0.85;
+            font-family: Consolas, monospace;
+            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -136,6 +146,7 @@
         <footer class="bottom">
             <span id="langs"></span>
             <span id="time"></span>
+            <span id="debugState" class="debug-state"></span>
         </footer>
     </main>
 
@@ -146,6 +157,7 @@
         const subtitleEl = document.getElementById("subtitle");
         const langsEl = document.getElementById("langs");
         const timeEl = document.getElementById("time");
+        const debugStateEl = document.getElementById("debugState");
         const targetLanguageEl = document.getElementById("targetLanguage");
         const fullscreenBtn = document.getElementById("fullscreenBtn");
         const signalRClient = window.signalR;
@@ -171,6 +183,12 @@
             .build();
 
         connection.on("translationUpdate", data => {
+            const eventType = data?.systemMessage
+                ? "system"
+                : (data?.isFinal ? "final" : "partial");
+            const chars = (data?.translatedText || data?.sourceText || "").length;
+            debugStateEl.textContent = `rx=${eventType} chars=${chars} state=${connection.state}`;
+
             if (data.systemMessage) {
                 subtitleEl.classList.remove("fade-out");
                 subtitleEl.textContent = data.systemMessage;
@@ -182,6 +200,14 @@
             if (!liveText) {
                 return;
             }
+
+            console.debug("[display] translationUpdate", {
+                roomId,
+                eventType,
+                chars,
+                sourceLanguage: data.sourceLanguage,
+                targetLanguage: data.targetLanguage
+            });
 
             showSubtitle(liveText);
             if (data.targetLanguage) {
@@ -196,16 +222,19 @@
         });
 
         connection.onreconnecting(() => {
+            debugStateEl.textContent = `rx=none chars=0 state=${connection.state}`;
             subtitleEl.classList.remove("fade-out");
             subtitleEl.textContent = "Reconnecting...";
         });
 
         connection.onreconnected(() => {
+            debugStateEl.textContent = `rx=none chars=0 state=${connection.state}`;
             subtitleEl.classList.remove("fade-out");
             subtitleEl.textContent = "Connected. Waiting for translation...";
         });
 
         connection.onclose(() => {
+            debugStateEl.textContent = `rx=none chars=0 state=${connection.state}`;
             subtitleEl.classList.remove("fade-out");
             subtitleEl.textContent = "Disconnected. Please refresh.";
         });
@@ -331,6 +360,7 @@
         async function init() {
             await connection.start();
             langsEl.textContent = `Room: ${roomId}`;
+            debugStateEl.textContent = `rx=none chars=0 state=${connection.state}`;
             await refreshStatus();
         }
 

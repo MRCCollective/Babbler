@@ -12,10 +12,14 @@ public sealed class TranslationHub : Hub
     private static readonly ConcurrentDictionary<string, int> RoomConnectionCounts =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly TranslationSessionService _session;
+    private readonly ILogger<TranslationHub> _logger;
 
-    public TranslationHub(TranslationSessionService session)
+    public TranslationHub(
+        TranslationSessionService session,
+        ILogger<TranslationHub> logger)
     {
         _session = session;
+        _logger = logger;
     }
 
     public override async Task OnConnectedAsync()
@@ -26,6 +30,17 @@ public sealed class TranslationHub : Hub
             Context.Items[RoomIdItemKey] = roomId;
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
             IncrementRoomConnection(roomId);
+            _logger.LogInformation(
+                "Hub connected: room={RoomId}, connection={ConnectionId}, clientsInRoom={RoomClients}",
+                roomId,
+                Context.ConnectionId,
+                GetRoomConnectionCount(roomId));
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Hub connected without roomId query. connection={ConnectionId}",
+                Context.ConnectionId);
         }
 
         await base.OnConnectedAsync();
@@ -39,6 +54,11 @@ public sealed class TranslationHub : Hub
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomId);
             DecrementRoomConnection(roomId);
+            _logger.LogInformation(
+                "Hub disconnected: room={RoomId}, connection={ConnectionId}, clientsInRoom={RoomClients}",
+                roomId,
+                Context.ConnectionId,
+                GetRoomConnectionCount(roomId));
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -53,9 +73,19 @@ public sealed class TranslationHub : Hub
             throw new HubException("Room connection is required.");
         }
 
+        var parsedPayload = ParseClientTranslationPayload(payload);
+        _logger.LogDebug(
+            "Hub publish inbound: room={RoomId}, connection={ConnectionId}, final={IsFinal}, sourceChars={SourceChars}, translationKeys={TranslationCount}",
+            roomId,
+            Context.ConnectionId,
+            parsedPayload.IsFinal,
+            parsedPayload.SourceText?.Length ?? 0,
+            parsedPayload.Translations?.Count ?? 0);
+
         return _session.PublishClientTranslationAsync(
             roomId,
-            ParseClientTranslationPayload(payload),
+            parsedPayload,
+            Context.ConnectionId,
             Context.ConnectionAborted);
     }
 
