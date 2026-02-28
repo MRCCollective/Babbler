@@ -42,8 +42,9 @@
 
         .top {
             display: flex;
-            justify-content: flex-end;
-            align-items: center;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.8rem;
             color: var(--muted);
             font-size: 1rem;
         }
@@ -89,6 +90,117 @@
             cursor: pointer;
         }
 
+        .tuning {
+            border: 1px solid rgba(249, 253, 255, 0.16);
+            border-radius: 12px;
+            background: rgba(10, 20, 33, 0.72);
+            padding: 0.45rem 0.55rem;
+            max-width: min(420px, 72vw);
+        }
+
+        .tuning summary {
+            cursor: pointer;
+            list-style: none;
+            user-select: none;
+            color: var(--text);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .tuning summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .tuning-body {
+            margin-top: 0.55rem;
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .tuning-row {
+            display: grid;
+            grid-template-columns: 170px 1fr auto;
+            gap: 0.55rem;
+            align-items: center;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .tuning-label {
+            display: grid;
+            gap: 0.12rem;
+            line-height: 1.15;
+        }
+
+        .tuning-label strong {
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .tuning-label small {
+            color: var(--muted);
+            font-size: 0.72rem;
+        }
+
+        .tuning-row input[type="range"] {
+            width: 100%;
+        }
+
+        .tuning-value {
+            font-family: Consolas, monospace;
+            color: var(--text);
+            min-width: 68px;
+            text-align: right;
+        }
+
+        .tuning-actions {
+            grid-template-columns: 1fr;
+            gap: 0.4rem;
+            margin-top: 0.1rem;
+        }
+
+        .tuning-reset-btn {
+            width: 100%;
+            border: 1px solid rgba(249, 253, 255, 0.25);
+            color: var(--text);
+            border-radius: 10px;
+            background: rgba(10, 20, 33, 0.84);
+            padding: 0.42rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .tuning-defaults {
+            color: var(--muted);
+            font-size: 0.72rem;
+            line-height: 1.3;
+        }
+
+        @media (max-width: 760px) {
+            .top {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .toolbar {
+                align-self: flex-end;
+            }
+
+            .tuning {
+                max-width: 100%;
+            }
+
+            .tuning-row {
+                grid-template-columns: 1fr;
+                gap: 0.3rem;
+            }
+
+            .tuning-value {
+                text-align: left;
+            }
+        }
+
         .subtitle {
             align-self: end;
             font-size: clamp(2rem, 6vw, 5.4rem);
@@ -97,7 +209,7 @@
             text-wrap: balance;
             text-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
             opacity: 1;
-            transition: opacity 170ms ease-out;
+            transition: opacity var(--subtitle-fade-duration, 170ms) ease-out;
         }
 
         .subtitle.fade-out {
@@ -115,6 +227,58 @@
 <body>
     <main class="stage">
         <header class="top">
+            <details class="tuning">
+                <summary>Tuning</summary>
+                <div class="tuning-body">
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Delayed Commit</strong>
+                            <small>Wait before replacing subtitle text</small>
+                        </div>
+                        <input id="updateDelaySlider" type="range" min="0" max="2000" step="50" value="450" />
+                        <span id="updateDelayValue" class="tuning-value">450 ms | Balanced</span>
+                    </div>
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Fadeout Length</strong>
+                            <small>How slowly subtitle disappears after silence</small>
+                        </div>
+                        <input id="fadeoutDurationSlider" type="range" min="100" max="2000" step="50" value="350" />
+                        <span id="fadeoutDurationValue" class="tuning-value">350 ms | Smooth</span>
+                    </div>
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Time Before Disappear</strong>
+                            <small>How long subtitle stays before fade begins</small>
+                        </div>
+                        <input id="clearIdleDelaySlider" type="range" min="500" max="8000" step="100" value="2200" />
+                        <span id="clearIdleDelayValue" class="tuning-value">2200 ms | Readable</span>
+                    </div>
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Quiet Gap For New Sentence</strong>
+                            <small>Silence needed before next speech starts a new sentence</small>
+                        </div>
+                        <input id="newSentenceQuietGapSlider" type="range" min="200" max="5000" step="100" value="1200" />
+                        <span id="newSentenceQuietGapValue" class="tuning-value">1200 ms | Natural</span>
+                    </div>
+                    <div class="tuning-row">
+                        <div class="tuning-label">
+                            <strong>Words Per Commit</strong>
+                            <small>Show subtitle updates in fixed word blocks</small>
+                        </div>
+                        <input id="minCommitWordsSlider" type="range" min="1" max="12" step="1" value="4" />
+                        <span id="minCommitWordsValue" class="tuning-value">4 words | Balanced Blocks</span>
+                    </div>
+                    <div class="tuning-row tuning-actions">
+                        <button id="resetTuningBtn" type="button" class="tuning-reset-btn">Back To Default</button>
+                        <span class="tuning-defaults">
+                            Defaults: Delayed Commit 450 ms, Fadeout 350 ms, Time Before Disappear 2200 ms,
+                            Quiet Gap 1200 ms, Words/Commit 4.
+                        </span>
+                    </div>
+                </div>
+            </details>
             <div class="toolbar">
                 <select id="targetLanguage" title="Target language">
                     <option value="en">English</option>
@@ -143,16 +307,50 @@
     <script>
         const SUPPORTED_TARGET_LANGUAGES = ["en", "sv", "es", "fr", "de", "it", "ja"];
         const TARGET_LANGUAGE_STORAGE_KEY = "babbler_display_target_language";
-        const SUBTITLE_CLEAR_IDLE_MS = 2200;
-        const SUBTITLE_FADE_DURATION_MS = 170;
+        const UPDATE_DELAY_STORAGE_KEY = "babbler_display_update_delay_ms";
+        const FADEOUT_DURATION_STORAGE_KEY = "babbler_display_fadeout_duration_ms";
+        const CLEAR_IDLE_DELAY_STORAGE_KEY = "babbler_display_clear_idle_delay_ms";
+        const NEW_SENTENCE_QUIET_GAP_STORAGE_KEY = "babbler_display_new_sentence_quiet_gap_ms";
+        const MIN_COMMIT_WORDS_STORAGE_KEY = "babbler_display_min_commit_words";
+        const DEFAULT_CLEAR_IDLE_DELAY_MS = 2200;
+        const DEFAULT_NEW_SENTENCE_QUIET_GAP_MS = 1200;
+        const DEFAULT_UPDATE_DELAY_MS = 450;
+        const DEFAULT_FADEOUT_DURATION_MS = 350;
+        const DEFAULT_MIN_COMMIT_WORDS = 4;
+        const MIN_UPDATE_DELAY_MS = 0;
+        const MAX_UPDATE_DELAY_MS = 2000;
+        const MIN_FADEOUT_DURATION_MS = 100;
+        const MAX_FADEOUT_DURATION_MS = 2000;
+        const MIN_CLEAR_IDLE_DELAY_MS = 500;
+        const MAX_CLEAR_IDLE_DELAY_MS = 8000;
+        const MIN_NEW_SENTENCE_QUIET_GAP_MS = 200;
+        const MAX_NEW_SENTENCE_QUIET_GAP_MS = 5000;
+        const MIN_MIN_COMMIT_WORDS = 1;
+        const MAX_MIN_COMMIT_WORDS = 12;
         const subtitleEl = document.getElementById("subtitle");
         const langsEl = document.getElementById("langs");
         const timeEl = document.getElementById("time");
         const targetLanguageEl = document.getElementById("targetLanguage");
+        const updateDelaySliderEl = document.getElementById("updateDelaySlider");
+        const updateDelayValueEl = document.getElementById("updateDelayValue");
+        const fadeoutDurationSliderEl = document.getElementById("fadeoutDurationSlider");
+        const fadeoutDurationValueEl = document.getElementById("fadeoutDurationValue");
+        const clearIdleDelaySliderEl = document.getElementById("clearIdleDelaySlider");
+        const clearIdleDelayValueEl = document.getElementById("clearIdleDelayValue");
+        const newSentenceQuietGapSliderEl = document.getElementById("newSentenceQuietGapSlider");
+        const newSentenceQuietGapValueEl = document.getElementById("newSentenceQuietGapValue");
+        const minCommitWordsSliderEl = document.getElementById("minCommitWordsSlider");
+        const minCommitWordsValueEl = document.getElementById("minCommitWordsValue");
+        const resetTuningBtn = document.getElementById("resetTuningBtn");
         const fullscreenBtn = document.getElementById("fullscreenBtn");
         const signalRClient = window.signalR;
         let subtitleClearTimer = null;
+        let subtitleUpdateTimer = null;
         let subtitleVersion = 0;
+        let pendingSubtitleText = "";
+        let pendingSubtitleTimestamp = null;
+        let lastSubtitleRenderAt = 0;
+        let lastSpeechUpdateAt = 0;
         const roomId = getRoomIdFromQuery();
 
         if (!roomId) {
@@ -165,6 +363,7 @@
             throw new Error("SignalR client failed to load.");
         }
 
+        initTuningControls();
         targetLanguageEl.value = getInitialTargetLanguage();
 
         const connection = new signalRClient.HubConnectionBuilder()
@@ -176,9 +375,7 @@
 
         connection.on("translationUpdate", data => {
             if (data.systemMessage) {
-                subtitleEl.classList.remove("fade-out");
-                subtitleEl.textContent = data.systemMessage;
-                timeEl.textContent = new Date(data.timestampUtc || Date.now()).toLocaleTimeString();
+                showSystemMessage(data.systemMessage, data.timestampUtc);
                 return;
             }
 
@@ -187,24 +384,40 @@
                 return;
             }
 
-            showSubtitle(liveText);
+            const isFinal = readIsFinal(data);
+            const committedText = buildCommittedSubtitleText(liveText, isFinal);
+            if (!committedText) {
+                return;
+            }
+
+            if (committedText === pendingSubtitleText || committedText === subtitleEl.textContent) {
+                return;
+            }
+
+            const now = Date.now();
+            const quietGapMs = lastSpeechUpdateAt > 0
+                ? now - lastSpeechUpdateAt
+                : 0;
+            const shouldStartNewSentence = quietGapMs >= getNewSentenceQuietGapMs();
+            if (shouldStartNewSentence) {
+                startNewSentenceFlow();
+            }
+            lastSpeechUpdateAt = now;
+
+            queueSubtitle(committedText, data.timestampUtc);
             updateFooterLanguages(data);
-            timeEl.textContent = new Date(data.timestampUtc || Date.now()).toLocaleTimeString();
         });
 
         connection.onreconnecting(() => {
-            subtitleEl.classList.remove("fade-out");
-            subtitleEl.textContent = "Reconnecting...";
+            showSystemMessage("Reconnecting...");
         });
 
         connection.onreconnected(() => {
-            subtitleEl.classList.remove("fade-out");
-            subtitleEl.textContent = "Connected. Waiting for translation...";
+            showSystemMessage("Connected. Waiting for translation...");
         });
 
         connection.onclose(() => {
-            subtitleEl.classList.remove("fade-out");
-            subtitleEl.textContent = "Disconnected. Please refresh.";
+            showSystemMessage("Disconnected. Please refresh.");
         });
 
         targetLanguageEl.addEventListener("change", () => {
@@ -213,6 +426,106 @@
             localStorage.setItem(TARGET_LANGUAGE_STORAGE_KEY, nextValue);
             updateFooterLanguages();
         });
+
+        updateDelaySliderEl.addEventListener("input", () => {
+            applyTuningSettings();
+        });
+
+        fadeoutDurationSliderEl.addEventListener("input", () => {
+            applyTuningSettings();
+        });
+
+        clearIdleDelaySliderEl.addEventListener("input", () => {
+            applyTuningSettings();
+        });
+
+        newSentenceQuietGapSliderEl.addEventListener("input", () => {
+            applyTuningSettings();
+        });
+
+        minCommitWordsSliderEl.addEventListener("input", () => {
+            applyTuningSettings();
+        });
+
+        resetTuningBtn.addEventListener("click", () => {
+            resetTuningToDefaults();
+        });
+
+        function showSystemMessage(message, timestampUtc = Date.now()) {
+            clearPendingSubtitleQueue();
+
+            if (subtitleClearTimer !== null) {
+                clearTimeout(subtitleClearTimer);
+                subtitleClearTimer = null;
+            }
+
+            subtitleVersion += 1;
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = message;
+            timeEl.textContent = new Date(timestampUtc || Date.now()).toLocaleTimeString();
+        }
+
+        function queueSubtitle(text, timestampUtc = Date.now()) {
+            pendingSubtitleText = (text || "").trim();
+            pendingSubtitleTimestamp = timestampUtc || Date.now();
+            if (!pendingSubtitleText) {
+                return;
+            }
+
+            const delayMs = getUpdateDelayMs();
+            if (delayMs <= 0) {
+                flushQueuedSubtitle();
+                return;
+            }
+
+            if (subtitleUpdateTimer !== null) {
+                return;
+            }
+
+            const elapsedSinceLastRender = lastSubtitleRenderAt > 0
+                ? Date.now() - lastSubtitleRenderAt
+                : 0;
+            const waitMs = Math.max(0, delayMs - elapsedSinceLastRender);
+            subtitleUpdateTimer = setTimeout(() => {
+                subtitleUpdateTimer = null;
+                flushQueuedSubtitle();
+            }, waitMs);
+        }
+
+        function flushQueuedSubtitle() {
+            if (!pendingSubtitleText) {
+                return;
+            }
+
+            showSubtitle(pendingSubtitleText);
+            lastSubtitleRenderAt = Date.now();
+            timeEl.textContent = new Date(pendingSubtitleTimestamp || Date.now()).toLocaleTimeString();
+            pendingSubtitleText = "";
+            pendingSubtitleTimestamp = null;
+        }
+
+        function clearPendingSubtitleQueue() {
+            if (subtitleUpdateTimer !== null) {
+                clearTimeout(subtitleUpdateTimer);
+                subtitleUpdateTimer = null;
+            }
+
+            pendingSubtitleText = "";
+            pendingSubtitleTimestamp = null;
+        }
+
+        function startNewSentenceFlow() {
+            clearPendingSubtitleQueue();
+
+            if (subtitleClearTimer !== null) {
+                clearTimeout(subtitleClearTimer);
+                subtitleClearTimer = null;
+            }
+
+            subtitleVersion += 1;
+            subtitleEl.classList.remove("fade-out");
+            subtitleEl.textContent = "";
+        }
 
         function showSubtitle(text) {
             subtitleVersion += 1;
@@ -226,7 +539,7 @@
 
             subtitleClearTimer = setTimeout(() => {
                 clearSubtitleWithFade(currentVersion);
-            }, SUBTITLE_CLEAR_IDLE_MS);
+            }, getClearIdleDelayMs());
         }
 
         function clearSubtitleWithFade(version) {
@@ -235,13 +548,14 @@
             }
 
             subtitleEl.classList.add("fade-out");
+            const fadeDurationMs = getFadeoutDurationMs();
             setTimeout(() => {
                 if (version !== subtitleVersion) {
                     return;
                 }
 
                 subtitleEl.textContent = "";
-            }, SUBTITLE_FADE_DURATION_MS);
+            }, fadeDurationMs);
         }
 
         fullscreenBtn.addEventListener("click", async () => {
@@ -308,6 +622,255 @@
         function getInitialTargetLanguage() {
             const stored = localStorage.getItem(TARGET_LANGUAGE_STORAGE_KEY);
             return normalizeTargetLanguage(stored || targetLanguageEl.value || "en");
+        }
+
+        function initTuningControls() {
+            updateDelaySliderEl.value = readStoredTuningValue(
+                UPDATE_DELAY_STORAGE_KEY,
+                DEFAULT_UPDATE_DELAY_MS,
+                MIN_UPDATE_DELAY_MS,
+                MAX_UPDATE_DELAY_MS).toString();
+            fadeoutDurationSliderEl.value = readStoredTuningValue(
+                FADEOUT_DURATION_STORAGE_KEY,
+                DEFAULT_FADEOUT_DURATION_MS,
+                MIN_FADEOUT_DURATION_MS,
+                MAX_FADEOUT_DURATION_MS).toString();
+            clearIdleDelaySliderEl.value = readStoredTuningValue(
+                CLEAR_IDLE_DELAY_STORAGE_KEY,
+                DEFAULT_CLEAR_IDLE_DELAY_MS,
+                MIN_CLEAR_IDLE_DELAY_MS,
+                MAX_CLEAR_IDLE_DELAY_MS).toString();
+            newSentenceQuietGapSliderEl.value = readStoredTuningValue(
+                NEW_SENTENCE_QUIET_GAP_STORAGE_KEY,
+                DEFAULT_NEW_SENTENCE_QUIET_GAP_MS,
+                MIN_NEW_SENTENCE_QUIET_GAP_MS,
+                MAX_NEW_SENTENCE_QUIET_GAP_MS).toString();
+            minCommitWordsSliderEl.value = readStoredTuningValue(
+                MIN_COMMIT_WORDS_STORAGE_KEY,
+                DEFAULT_MIN_COMMIT_WORDS,
+                MIN_MIN_COMMIT_WORDS,
+                MAX_MIN_COMMIT_WORDS).toString();
+            applyTuningSettings();
+        }
+
+        function resetTuningToDefaults() {
+            updateDelaySliderEl.value = DEFAULT_UPDATE_DELAY_MS.toString();
+            fadeoutDurationSliderEl.value = DEFAULT_FADEOUT_DURATION_MS.toString();
+            clearIdleDelaySliderEl.value = DEFAULT_CLEAR_IDLE_DELAY_MS.toString();
+            newSentenceQuietGapSliderEl.value = DEFAULT_NEW_SENTENCE_QUIET_GAP_MS.toString();
+            minCommitWordsSliderEl.value = DEFAULT_MIN_COMMIT_WORDS.toString();
+            applyTuningSettings();
+        }
+
+        function applyTuningSettings() {
+            const updateDelayMs = getUpdateDelayMs();
+            const fadeoutDurationMs = getFadeoutDurationMs();
+            const clearIdleDelayMs = getClearIdleDelayMs();
+            const newSentenceQuietGapMs = getNewSentenceQuietGapMs();
+            const commitChunkWords = getCommitChunkWords();
+            const delayDescriptor = describeUpdateDelay(updateDelayMs);
+            const fadeDescriptor = describeFadeoutDuration(fadeoutDurationMs);
+            const clearIdleDescriptor = describeClearIdleDelay(clearIdleDelayMs);
+            const newSentenceDescriptor = describeNewSentenceQuietGap(newSentenceQuietGapMs);
+            const wordsPerCommitDescriptor = describeWordsPerCommit(commitChunkWords);
+
+            updateDelaySliderEl.value = updateDelayMs.toString();
+            fadeoutDurationSliderEl.value = fadeoutDurationMs.toString();
+            clearIdleDelaySliderEl.value = clearIdleDelayMs.toString();
+            newSentenceQuietGapSliderEl.value = newSentenceQuietGapMs.toString();
+            minCommitWordsSliderEl.value = commitChunkWords.toString();
+            updateDelayValueEl.textContent = `${updateDelayMs} ms | ${delayDescriptor}`;
+            fadeoutDurationValueEl.textContent = `${fadeoutDurationMs} ms | ${fadeDescriptor}`;
+            clearIdleDelayValueEl.textContent = `${clearIdleDelayMs} ms | ${clearIdleDescriptor}`;
+            newSentenceQuietGapValueEl.textContent = `${newSentenceQuietGapMs} ms | ${newSentenceDescriptor}`;
+            minCommitWordsValueEl.textContent = `${commitChunkWords} words | ${wordsPerCommitDescriptor}`;
+            subtitleEl.style.setProperty("--subtitle-fade-duration", `${fadeoutDurationMs}ms`);
+
+            localStorage.setItem(UPDATE_DELAY_STORAGE_KEY, updateDelayMs.toString());
+            localStorage.setItem(FADEOUT_DURATION_STORAGE_KEY, fadeoutDurationMs.toString());
+            localStorage.setItem(CLEAR_IDLE_DELAY_STORAGE_KEY, clearIdleDelayMs.toString());
+            localStorage.setItem(NEW_SENTENCE_QUIET_GAP_STORAGE_KEY, newSentenceQuietGapMs.toString());
+            localStorage.setItem(MIN_COMMIT_WORDS_STORAGE_KEY, commitChunkWords.toString());
+
+            if (subtitleUpdateTimer !== null && pendingSubtitleText) {
+                clearTimeout(subtitleUpdateTimer);
+                subtitleUpdateTimer = null;
+                queueSubtitle(pendingSubtitleText, pendingSubtitleTimestamp || Date.now());
+            }
+        }
+
+        function getUpdateDelayMs() {
+            const numeric = Number(updateDelaySliderEl.value);
+            return clampNumber(numeric, MIN_UPDATE_DELAY_MS, MAX_UPDATE_DELAY_MS, DEFAULT_UPDATE_DELAY_MS);
+        }
+
+        function getFadeoutDurationMs() {
+            const numeric = Number(fadeoutDurationSliderEl.value);
+            return clampNumber(numeric, MIN_FADEOUT_DURATION_MS, MAX_FADEOUT_DURATION_MS, DEFAULT_FADEOUT_DURATION_MS);
+        }
+
+        function getClearIdleDelayMs() {
+            const numeric = Number(clearIdleDelaySliderEl.value);
+            return clampNumber(numeric, MIN_CLEAR_IDLE_DELAY_MS, MAX_CLEAR_IDLE_DELAY_MS, DEFAULT_CLEAR_IDLE_DELAY_MS);
+        }
+
+        function getNewSentenceQuietGapMs() {
+            const numeric = Number(newSentenceQuietGapSliderEl.value);
+            return clampNumber(
+                numeric,
+                MIN_NEW_SENTENCE_QUIET_GAP_MS,
+                MAX_NEW_SENTENCE_QUIET_GAP_MS,
+                DEFAULT_NEW_SENTENCE_QUIET_GAP_MS);
+        }
+
+        function getCommitChunkWords() {
+            const numeric = Number(minCommitWordsSliderEl.value);
+            return clampNumber(numeric, MIN_MIN_COMMIT_WORDS, MAX_MIN_COMMIT_WORDS, DEFAULT_MIN_COMMIT_WORDS);
+        }
+
+        function describeUpdateDelay(valueMs) {
+            if (valueMs <= 150) {
+                return "Instant";
+            }
+
+            if (valueMs <= 400) {
+                return "Quick";
+            }
+
+            if (valueMs <= 750) {
+                return "Balanced";
+            }
+
+            if (valueMs <= 1200) {
+                return "Stable";
+            }
+
+            return "Very Stable";
+        }
+
+        function describeFadeoutDuration(valueMs) {
+            if (valueMs <= 200) {
+                return "Snappy";
+            }
+
+            if (valueMs <= 500) {
+                return "Smooth";
+            }
+
+            if (valueMs <= 900) {
+                return "Soft";
+            }
+
+            return "Cinematic";
+        }
+
+        function describeClearIdleDelay(valueMs) {
+            if (valueMs <= 1200) {
+                return "Fast Clear";
+            }
+
+            if (valueMs <= 2600) {
+                return "Readable";
+            }
+
+            if (valueMs <= 4200) {
+                return "Long Read";
+            }
+
+            return "Very Long Read";
+        }
+
+        function describeNewSentenceQuietGap(valueMs) {
+            if (valueMs <= 700) {
+                return "Reactive";
+            }
+
+            if (valueMs <= 1500) {
+                return "Natural";
+            }
+
+            if (valueMs <= 2600) {
+                return "Conservative";
+            }
+
+            return "Very Conservative";
+        }
+
+        function describeWordsPerCommit(wordCount) {
+            if (wordCount <= 2) {
+                return "Frequent";
+            }
+
+            if (wordCount <= 4) {
+                return "Balanced Blocks";
+            }
+
+            if (wordCount <= 7) {
+                return "Larger Blocks";
+            }
+
+            return "Very Large Blocks";
+        }
+
+        function buildCommittedSubtitleText(text, isFinal) {
+            const words = splitWords(text);
+            if (words.length === 0) {
+                return "";
+            }
+
+            if (isFinal) {
+                return words.join(" ");
+            }
+
+            const chunkWords = getCommitChunkWords();
+            const committedWordCount = Math.floor(words.length / chunkWords) * chunkWords;
+            if (committedWordCount <= 0) {
+                return "";
+            }
+
+            return words.slice(0, committedWordCount).join(" ");
+        }
+
+        function readIsFinal(data) {
+            if (typeof data?.isFinal === "boolean") {
+                return data.isFinal;
+            }
+
+            if (typeof data?.IsFinal === "boolean") {
+                return data.IsFinal;
+            }
+
+            return false;
+        }
+
+        function splitWords(value) {
+            const normalized = (value || "").trim();
+            if (!normalized) {
+                return [];
+            }
+
+            return normalized.split(/\s+/).filter(Boolean);
+        }
+
+        function readStoredTuningValue(storageKey, fallback, min, max) {
+            const numeric = Number(localStorage.getItem(storageKey));
+            return clampNumber(numeric, min, max, fallback);
+        }
+
+        function clampNumber(value, min, max, fallback) {
+            if (!Number.isFinite(value)) {
+                return fallback;
+            }
+
+            if (value < min) {
+                return min;
+            }
+
+            if (value > max) {
+                return max;
+            }
+
+            return Math.round(value);
         }
 
         function normalizeTargetLanguage(value) {
