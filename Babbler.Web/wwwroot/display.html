@@ -201,18 +201,32 @@
 
         .sim-controls {
             display: grid;
-            grid-template-columns: 115px 1fr auto auto;
+            grid-template-columns: 1fr;
             gap: 0.5rem;
-            align-items: center;
+            align-items: stretch;
         }
 
         .sim-controls input[type="range"] {
             width: 100%;
         }
 
+        .sim-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
         .sim-label {
             color: var(--muted);
             font-size: 0.75rem;
+        }
+
+        .sim-buttons {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            justify-content: flex-start;
         }
 
         .sim-btn {
@@ -256,6 +270,11 @@
             .sim-controls {
                 grid-template-columns: 1fr;
             }
+
+            .sim-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
 
         .subtitle {
@@ -292,8 +311,8 @@
                             <strong>Delayed Commit</strong>
                             <small>Wait before replacing subtitle text</small>
                         </div>
-                        <input id="updateDelaySlider" type="range" min="0" max="2000" step="50" value="450" />
-                        <span id="updateDelayValue" class="tuning-value">450 ms | Balanced</span>
+                        <input id="updateDelaySlider" type="range" min="0" max="2000" step="50" value="2000" />
+                        <span id="updateDelayValue" class="tuning-value">2000 ms | Very Stable</span>
                     </div>
                     <div class="tuning-row">
                         <div class="tuning-label">
@@ -308,16 +327,16 @@
                             <strong>Time Before Disappear</strong>
                             <small>How long subtitle stays before fade begins</small>
                         </div>
-                        <input id="clearIdleDelaySlider" type="range" min="500" max="8000" step="100" value="2200" />
-                        <span id="clearIdleDelayValue" class="tuning-value">2200 ms | Readable</span>
+                        <input id="clearIdleDelaySlider" type="range" min="500" max="8000" step="100" value="4000" />
+                        <span id="clearIdleDelayValue" class="tuning-value">4000 ms | Long Read</span>
                     </div>
                     <div class="tuning-row">
                         <div class="tuning-label">
                             <strong>Quiet Gap For New Sentence</strong>
                             <small>Silence needed before next speech starts a new sentence</small>
                         </div>
-                        <input id="newSentenceQuietGapSlider" type="range" min="200" max="5000" step="100" value="1200" />
-                        <span id="newSentenceQuietGapValue" class="tuning-value">1200 ms | Natural</span>
+                        <input id="newSentenceQuietGapSlider" type="range" min="200" max="5000" step="100" value="800" />
+                        <span id="newSentenceQuietGapValue" class="tuning-value">800 ms | Natural</span>
                     </div>
                     <div class="tuning-row">
                         <div class="tuning-label">
@@ -330,14 +349,14 @@
                     <div class="tuning-row tuning-actions">
                         <button id="resetTuningBtn" type="button" class="tuning-reset-btn">Back To Default</button>
                         <span class="tuning-defaults">
-                            Defaults: Delayed Commit 450 ms, Fadeout 350 ms, Time Before Disappear 2200 ms,
-                            Quiet Gap 1200 ms, Words/Commit 4, Simulation Speed 220 ms/word.
+                            Defaults: Delayed Commit 2000 ms, Fadeout 350 ms, Time Before Disappear 4000 ms,
+                            Quiet Gap 800 ms, Words/Commit 4, Simulation Speed 220 ms/word.
                         </span>
                     </div>
                     <div class="tuning-row tuning-sim">
                         <div class="tuning-label">
                             <strong>Simulate Speech</strong>
-                            <small>Type sample text and play it as if someone is speaking</small>
+                            <small>Type sample text and play it in a loop until stopped</small>
                         </div>
                         <textarea
                             id="simulateTextInput"
@@ -345,10 +364,12 @@
                             placeholder="Paste sample speech here to test tuning..."
                         >Hello everyone, and welcome to this live translation preview. Today we are testing how subtitle timing feels for a real audience, including short pauses, longer pauses, and natural sentence breaks. The goal is to find a balance where text appears quickly enough to follow the speaker, but stays stable enough to read without distracting jumps. In this section we will speak in a normal tempo, then speed up slightly, and finally slow down again so we can compare the behavior across different rhythms. If the subtitles feel too nervous, increase delayed commit or words per commit; if they feel too slow, reduce those settings until readability and responsiveness feel right.</textarea>
                         <div class="sim-controls">
-                            <span class="sim-label">Simulation Speed</span>
+                            <div class="sim-header">
+                                <span class="sim-label">Simulation Speed</span>
+                                <span id="simulateSpeedValue" class="tuning-value">220 ms/word | Natural</span>
+                            </div>
                             <input id="simulateSpeedSlider" type="range" min="80" max="800" step="20" value="220" />
-                            <span id="simulateSpeedValue" class="tuning-value">220 ms/word | Natural</span>
-                            <div>
+                            <div class="sim-buttons">
                                 <button id="simulateStartBtn" type="button" class="sim-btn">Start</button>
                                 <button id="simulateStopBtn" type="button" class="sim-btn" disabled>Stop</button>
                             </div>
@@ -390,9 +411,9 @@
         const NEW_SENTENCE_QUIET_GAP_STORAGE_KEY = "babbler_display_new_sentence_quiet_gap_ms";
         const MIN_COMMIT_WORDS_STORAGE_KEY = "babbler_display_min_commit_words";
         const SIMULATION_SPEED_STORAGE_KEY = "babbler_display_simulation_speed_ms";
-        const DEFAULT_CLEAR_IDLE_DELAY_MS = 2200;
-        const DEFAULT_NEW_SENTENCE_QUIET_GAP_MS = 1200;
-        const DEFAULT_UPDATE_DELAY_MS = 450;
+        const DEFAULT_CLEAR_IDLE_DELAY_MS = 4000;
+        const DEFAULT_NEW_SENTENCE_QUIET_GAP_MS = 800;
+        const DEFAULT_UPDATE_DELAY_MS = 2000;
         const DEFAULT_FADEOUT_DURATION_MS = 350;
         const DEFAULT_MIN_COMMIT_WORDS = 4;
         const DEFAULT_SIMULATION_SPEED_MS = 220;
@@ -637,7 +658,7 @@
             }
 
             stopSimulation({ silent: true });
-            startNewSentenceFlow();
+            startNewSentenceFlow({ clearDisplay: true });
             lastSpeechUpdateAt = 0;
 
             simulationWords = words;
@@ -665,14 +686,17 @@
             }, { fromSimulation: true });
 
             if (isFinal) {
-                stopSimulation({ silent: true });
+                simulationWordIndex = 0;
+                lastSpeechUpdateAt = 0;
+                startNewSentenceFlow();
+                scheduleNextSimulationTick(Math.max(getSimulationSpeedMs(), getNewSentenceQuietGapMs()));
                 return;
             }
 
             scheduleNextSimulationTick();
         }
 
-        function scheduleNextSimulationTick() {
+        function scheduleNextSimulationTick(customDelayMs) {
             if (!simulationRunning) {
                 return;
             }
@@ -684,7 +708,7 @@
             simulationTimer = setTimeout(() => {
                 simulationTimer = null;
                 runSimulationTick();
-            }, getSimulationSpeedMs());
+            }, Math.max(0, Number.isFinite(customDelayMs) ? customDelayMs : getSimulationSpeedMs()));
         }
 
         function rescheduleSimulationTick() {
@@ -721,7 +745,8 @@
             simulateTextInputEl.disabled = simulationRunning;
         }
 
-        function startNewSentenceFlow() {
+        function startNewSentenceFlow(options = {}) {
+            const { clearDisplay = false } = options;
             clearPendingSubtitleQueue();
 
             if (subtitleClearTimer !== null) {
@@ -731,7 +756,9 @@
 
             subtitleVersion += 1;
             subtitleEl.classList.remove("fade-out");
-            subtitleEl.textContent = "";
+            if (clearDisplay) {
+                subtitleEl.textContent = "";
+            }
         }
 
         function showSubtitle(text) {
