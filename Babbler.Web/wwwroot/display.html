@@ -464,7 +464,8 @@
             const quietGapMs = lastSpeechUpdateAt > 0
                 ? now - lastSpeechUpdateAt
                 : 0;
-            const shouldStartNewSentence = quietGapMs >= getNewSentenceQuietGapMs();
+            const likelyContinuation = isLikelySentenceContinuation(activeSentenceText, committedText);
+            const shouldStartNewSentence = quietGapMs >= getNewSentenceQuietGapMs() && !likelyContinuation;
             if (shouldStartNewSentence) {
                 startNewSentenceFlow();
             }
@@ -899,6 +900,44 @@
             }
 
             return normalized.split(/\s+/).filter(Boolean);
+        }
+
+        function isLikelySentenceContinuation(previousText, nextText) {
+            const previous = normalizeSentenceForComparison(previousText);
+            const next = normalizeSentenceForComparison(nextText);
+            if (!previous || !next) {
+                return false;
+            }
+
+            if (next.startsWith(previous) || previous.startsWith(next)) {
+                return true;
+            }
+
+            const previousWords = splitWords(previous);
+            const nextWords = splitWords(next);
+            if (previousWords.length === 0 || nextWords.length === 0) {
+                return false;
+            }
+
+            const maxCompare = Math.min(previousWords.length, nextWords.length, 4);
+            let leadingMatches = 0;
+            for (let i = 0; i < maxCompare; i += 1) {
+                if (previousWords[i] !== nextWords[i]) {
+                    break;
+                }
+
+                leadingMatches += 1;
+            }
+
+            return leadingMatches >= 2;
+        }
+
+        function normalizeSentenceForComparison(value) {
+            return (value || "")
+                .toLowerCase()
+                .replace(/[^\p{L}\p{N}\s]/gu, " ")
+                .replace(/\s+/g, " ")
+                .trim();
         }
 
         function trimDisplayedSentences(maxSentences) {
