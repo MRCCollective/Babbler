@@ -548,9 +548,9 @@
         let micMeterAnalyser = null;
         let micMeterSource = null;
         let micMeterFrameHandle = null;
-        let micMeterLevel = 0;
-        let micActivityResetHandle = null;
+        let micActivityFrameHandle = null;
         let micActivityAnimationEnabled = false;
+        let micActivityBoost = 0;
         let selectedMicDeviceId = "";
         let currentRecognitionDeviceId = "";
         let currentRecognitionLanguage = "";
@@ -1081,12 +1081,6 @@
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 addDebugLine("microphone permission confirmed");
-                const track = stream.getAudioTracks()[0];
-                if (track && typeof track.getSettings === "function") {
-                    const settings = track.getSettings();
-                    addDebugLine(
-                        `microphone settings sampleRate=${settings.sampleRate ?? "?"} channels=${settings.channelCount ?? "?"} deviceId=${settings.deviceId ? "set" : "default"}`);
-                }
             } finally {
                 if (stream) {
                     for (const track of stream.getTracks()) {
@@ -1114,24 +1108,23 @@
                 audioConfig);
 
             recognizer.recognizing = (_, event) => {
-                const partialText = (event?.result?.text || "").trim();
-                if (isMeaningfulSpeechText(partialText)) {
+                if (event?.result?.text) {
                     lastMicActivityAt = Date.now();
+                    noteMicSpeechActivity(false);
                     if (Date.now() - lastDebugRecognizingAt > 3000) {
                         lastDebugRecognizingAt = Date.now();
-                        addDebugLine(`recognizing partial chars=${partialText.length}`);
+                        addDebugLine(`recognizing partial chars=${event.result.text.length}`);
                     }
                 }
                 publishRecognitionResult(sourceLanguage, false, event?.result);
             };
 
             recognizer.recognized = (_, event) => {
-                const finalText = (event?.result?.text || "").trim();
-                if (isMeaningfulSpeechText(finalText)) {
+                if (event?.result?.text) {
                     lastMicActivityAt = Date.now();
                     noteMicSpeechActivity(true);
-                    addLine(`[mic-final] ${finalText}`);
-                    addDebugLine(`recognized final chars=${finalText.length}`);
+                    addLine(`[mic-final] ${event.result.text}`);
+                    addDebugLine(`recognized final chars=${event.result.text.length}`);
                 }
                 publishRecognitionResult(sourceLanguage, true, event?.result);
             };
@@ -1147,7 +1140,22 @@
                 if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
                     return;
                 }
-                addLine("[system] Recognition session ended. Click Start Translation to resume.", true);
+
+                const now = Date.now();
+                if (recognizerRestartInProgress || now - lastRecognizerRestartAt < 4000) {
+                    return;
+                }
+
+                lastRecognizerRestartAt = now;
+                recognizerRestartInProgress = true;
+                addLine("[system] Restarting microphone recognition after unexpected session stop...", true);
+                startBrowserRecognition(roomId, sourceLanguage).then(() => {
+                    addLine("[system] Microphone recognition restarted.", true);
+                }).catch(err => {
+                    addLine(`[error] Auto-restart after session stop failed: ${err?.message || err}`, true);
+                }).finally(() => {
+                    recognizerRestartInProgress = false;
+                });
             };
 
             recognizer.canceled = (_, event) => {
@@ -1158,7 +1166,22 @@
                 if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
                     return;
                 }
-                addLine("[system] Recognition canceled. Click Start Translation to retry.", true);
+
+                const now = Date.now();
+                if (recognizerRestartInProgress || now - lastRecognizerRestartAt < 4000) {
+                    return;
+                }
+
+                lastRecognizerRestartAt = now;
+                recognizerRestartInProgress = true;
+                addLine("[system] Restarting microphone recognition...", true);
+                startBrowserRecognition(roomId, sourceLanguage).then(() => {
+                    addLine("[system] Microphone recognition restarted.", true);
+                }).catch(err => {
+                    addLine(`[error] Auto-restart failed: ${err?.message || err}`, true);
+                }).finally(() => {
+                    recognizerRestartInProgress = false;
+                });
             };
 
             return recognizer;
@@ -1285,7 +1308,7 @@
             {
                 micInputEl.value = activeDeviceId;
             }
-            addLine("[system] Mic level meter paused during active translation.", true);
+            addLine("[system] Mic activity animation enabled during active translation.", true);
             addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
             addDebugLine(`recognizer active source=${sourceLanguage} mic="${activeDeviceLabel}"`);
         }
@@ -1349,6 +1372,66 @@
                 lastMicWarningAt = now;
                 addLine("[error] No speech detected from microphone yet. Check browser mic input device and site permission.", true);
                 addDebugLine("watchdog: no speech recognized for >15s", "warn");
+
+                if (!sourceLanguageAutoFallbackUsed &&
+                    now - lastMicActivityAt >= 20000 &&
+                    browserRecognizerRoomId &&
+                    !recognizerRestartInProgress)
+                {
+                    const fallbackLanguage = getSourceLanguageFallback(currentRecognitionLanguage);
+                    if (fallbackLanguage) {
+                        sourceLanguageAutoFallbackUsed = true;
+                        sourceLanguageEl.value = fallbackLanguage;
+                        addLine(
+                            `[system] No speech recognized. Trying source language ${fallbackLanguage}.`,
+                            true);
+                        startBrowserRecognition(browserRecognizerRoomId, fallbackLanguage)
+                            .then(() => {
+                                addLine("[system] Source language fallback applied.", true);
+                            })
+                            .catch(err => {
+                                addLine(`[error] Source language fallback failed: ${err?.message || err}`, true);
+                            });
+                        return;
+                    }
+                }
+
+                if (now - lastMicActivityAt < 25000) {
+                    return;
+                }
+
+                if (!currentRecognitionDeviceId || !browserRecognizerRoomId) {
+                    return;
+                }
+
+                if (micNoSpeechRecoveryInProgress || recognizerRestartInProgress) {
+                    return;
+                }
+
+                if (now - lastMicAutoFallbackAt < 30000) {
+                    return;
+                }
+
+                micNoSpeechRecoveryInProgress = true;
+                lastMicAutoFallbackAt = now;
+                addLine(
+                    "[system] No speech recognized from selected microphone. Switching to system default mic.",
+                    true);
+
+                selectedMicDeviceId = "";
+                currentRecognitionDeviceId = "";
+                micInputEl.value = "";
+
+                startBrowserRecognition(browserRecognizerRoomId, sourceLanguageEl.value)
+                    .then(() => {
+                        addLine("[system] Fallback to system default mic applied.", true);
+                    })
+                    .catch(err => {
+                        addLine(`[error] Automatic fallback to default mic failed: ${err?.message || err}`, true);
+                    })
+                    .finally(() => {
+                        micNoSpeechRecoveryInProgress = false;
+                    });
             }, 5000);
         }
 
@@ -1368,8 +1451,8 @@
 
             try {
                 const audioConstraint = deviceId
-                    ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-                    : { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+                    ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
                 let stream = null;
                 try {
@@ -1390,7 +1473,6 @@
                 micMeterAudioContext = audioContext;
                 micMeterAnalyser = analyser;
                 micMeterSource = source;
-                micMeterLevel = 0;
 
                 runMicMeterFrame();
             } catch (err) {
@@ -1428,7 +1510,6 @@
             }
 
             micMeterAnalyser = null;
-            micMeterLevel = 0;
             setMicLevel(0);
         }
 
@@ -1449,47 +1530,45 @@
             }
 
             const rms = Math.sqrt(sumSquares / bufferLength);
-            // Keep silence stable and avoid constant low-level pulsing.
-            const noiseFloor = 0.035;
-            const usable = Math.max(0, rms - noiseFloor);
-            const normalized = Math.min(1, usable / 0.18);
-            const rawPercent = normalized * 100;
-            micMeterLevel = Math.max(rawPercent, micMeterLevel * 0.8);
-            if (micMeterLevel < 2) {
-                micMeterLevel = 0;
-            }
-
-            setMicLevel(Math.round(micMeterLevel));
+            const percent = Math.max(0, Math.min(100, Math.round(rms * 240)));
+            setMicLevel(percent);
 
             micMeterFrameHandle = requestAnimationFrame(runMicMeterFrame);
         }
 
-        function isMeaningfulSpeechText(text) {
-            if (!text || text.length < 3) {
-                return false;
-            }
-
-            const lettersOnly = text.replace(/[^A-Za-zÅÄÖåäö]/g, "");
-            return lettersOnly.length >= 3;
-        }
-
         function noteMicSpeechActivity(isStrong) {
-            // Intentionally no-op while translation is active.
-            // The meter is used only before start for microphone/device checks.
+            micActivityBoost = Math.max(micActivityBoost, isStrong ? 1 : 0.7);
         }
 
         function startMicActivityAnimation() {
             stopMicActivityAnimation(false);
-            micActivityAnimationEnabled = false;
-            setMicLevel(0);
+            micActivityAnimationEnabled = true;
+            micActivityBoost = 0;
+
+            const tick = () => {
+                if (!micActivityAnimationEnabled) {
+                    return;
+                }
+
+                const now = Date.now();
+                const baseline = 10 + ((Math.sin(now / 190) + 1) * 6);
+                micActivityBoost *= 0.92;
+                const boost = micActivityBoost * 78;
+                const percent = Math.max(baseline, Math.min(100, Math.round(baseline + boost)));
+                setMicLevel(percent);
+                micActivityFrameHandle = requestAnimationFrame(tick);
+            };
+
+            tick();
         }
 
         function stopMicActivityAnimation(resetMeter = true) {
             micActivityAnimationEnabled = false;
+            micActivityBoost = 0;
 
-            if (micActivityResetHandle !== null) {
-                clearTimeout(micActivityResetHandle);
-                micActivityResetHandle = null;
+            if (micActivityFrameHandle !== null) {
+                cancelAnimationFrame(micActivityFrameHandle);
+                micActivityFrameHandle = null;
             }
 
             if (resetMeter) {
@@ -1504,14 +1583,6 @@
 
         function publishRecognitionResult(sourceLanguage, isFinal, result) {
             if (!connection || !result) {
-                return;
-            }
-
-            if (connection.state !== signalRClient.HubConnectionState.Connected) {
-                if (Date.now() - lastPublishErrorAt > 4000) {
-                    lastPublishErrorAt = Date.now();
-                    addLine(`[error] Live publish skipped because SignalR state is ${connection.state}.`, true);
-                }
                 return;
             }
 
@@ -1568,12 +1639,6 @@
             try {
                 if (roomId !== currentRoomId) {
                     await switchRoom(roomId);
-                }
-
-                if (!connection || connection.state !== signalRClient.HubConnectionState.Connected) {
-                    addLine("[system] Live feed disconnected. Reconnecting before start...", true);
-                    addDebugLine(`signalr reconnect required before start. state=${connection?.state || "none"}`, "warn");
-                    await connectToRoom(roomId);
                 }
 
                 if (document.hidden) {
@@ -1799,28 +1864,6 @@
             }
         }
 
-        async function refreshInfrastructureDiagnostics() {
-            const response = await fetchJson("/api/infra");
-            if (!response.ok || !response.data) {
-                throw new Error(response.errorMessage || "Infrastructure diagnostics unavailable.");
-            }
-
-            const infra = response.data;
-            addLine(
-                `[system] infra: ws=${infra.webSocketsEnabled ?? "unknown"}, arrCookie=${infra.arrAffinityCookiePresent ? "yes" : "no"}, instance=${infra.instanceId || "n/a"}`,
-                true);
-            addDebugLine(
-                `infra ws=${infra.webSocketsEnabled ?? "unknown"} arrCookie=${infra.arrAffinityCookiePresent ? "yes" : "no"} sku=${infra.sku || "n/a"} site=${infra.siteName || "n/a"}`);
-        }
-
-        async function refreshInfrastructureDiagnosticsSafe() {
-            try {
-                await refreshInfrastructureDiagnostics();
-            } catch {
-                // Ignore infrastructure diagnostic errors.
-            }
-        }
-
         async function refreshRoomDiagnostics() {
             const response = await fetchJson(`${roomApiBase()}/diag`);
             if (!response.ok || !response.data) {
@@ -1831,18 +1874,10 @@
             const publishAgeMs = diag.lastClientPublishAtUtc
                 ? Date.now() - Date.parse(diag.lastClientPublishAtUtc)
                 : null;
-            const payloadAgeMs = diag.lastClientPayloadReceivedAtUtc
-                ? Date.now() - Date.parse(diag.lastClientPayloadReceivedAtUtc)
-                : null;
-            const payloadsReceived = Number(diag.clientPayloadsReceived ?? 0);
-            const payloadsForwarded = Number(diag.clientPayloadsForwarded ?? 0);
-            const payloadsDroppedEmpty = Number(diag.clientPayloadsDroppedEmpty ?? 0);
-            const payloadsDroppedNotRunning = Number(diag.clientPayloadsDroppedNotRunning ?? 0);
-            const payloadSendErrors = Number(diag.clientPayloadSendErrors ?? 0);
             if (Date.now() - lastRoomDiagDebugAt > 10000) {
                 lastRoomDiagDebugAt = Date.now();
                 addDebugLine(
-                    `roomdiag running=${diag.isRunning} hubClients=${diag.activeHubConnections ?? 0} recv=${payloadsReceived} fwd=${payloadsForwarded} dropEmpty=${payloadsDroppedEmpty} sendErr=${payloadSendErrors} lastPayload=${diag.lastClientPayloadReceivedAtUtc || "none"} lastPublish=${diag.lastClientPublishAtUtc || "none"} stopReason=${diag.lastStopReason || "-"}`);
+                    `roomdiag running=${diag.isRunning} hubClients=${diag.activeHubConnections ?? 0} lastPublish=${diag.lastClientPublishAtUtc || "none"} stopReason=${diag.lastStopReason || "-"}`);
             }
 
             const signature = [
@@ -1863,23 +1898,9 @@
                 const now = Date.now();
                 if (now - lastRoomDiagWarningAt > 15000) {
                     lastRoomDiagWarningAt = now;
-                    if (payloadsReceived === 0 || payloadAgeMs === null || payloadAgeMs > 15000) {
-                        addLine(
-                            "[error] No speech payload reached server recently. Check browser speech recognition and source language.",
-                            true);
-                    } else if (payloadsForwarded === 0) {
-                        addLine(
-                            `[error] Server received speech payloads but forwarded none (dropEmpty=${payloadsDroppedEmpty}, dropNotRunning=${payloadsDroppedNotRunning}).`,
-                            true);
-                    } else if (payloadSendErrors > 0) {
-                        addLine(
-                            `[error] Server forwarding errors detected (sendErr=${payloadSendErrors}). Check SignalR connectivity.`,
-                            true);
-                    } else {
-                        addLine(
-                            `[error] No captions published recently while room is running (clients=${diag.activeHubConnections ?? 0}).`,
-                            true);
-                    }
+                    addLine(
+                        `[error] No captions published recently while room is running (clients=${diag.activeHubConnections ?? 0}).`,
+                        true);
                 }
             }
         }
@@ -1987,7 +2008,6 @@
             await ensureRoom();
             await refreshRoomsSafe();
             await refreshDiagnosticsSafe();
-            await refreshInfrastructureDiagnosticsSafe();
             await refreshRoomDiagnosticsSafe();
             startStatusPolling();
             startRoomPolling();

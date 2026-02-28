@@ -176,23 +176,16 @@ public sealed class TranslationSessionService : IAsyncDisposable
     public async Task PublishClientTranslationAsync(
         string roomId,
         ClientTranslationUpdate payload,
-        string? connectionId = null,
         CancellationToken cancellationToken = default)
     {
         TranslationUpdate? update;
-        string? normalizedRoomId = null;
 
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var room = GetRoomOrThrow(roomId);
-            normalizedRoomId = room.RoomId;
-            room.LastClientPayloadReceivedAtUtc = DateTimeOffset.UtcNow;
-            room.ClientPayloadsReceived += 1;
-
             if (!room.IsRunning)
             {
-                room.ClientPayloadsDroppedNotRunning += 1;
                 return;
             }
 
@@ -208,7 +201,6 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
             if (string.IsNullOrWhiteSpace(sourceText) && string.IsNullOrWhiteSpace(translatedText))
             {
-                room.ClientPayloadsDroppedEmpty += 1;
                 return;
             }
 
@@ -224,7 +216,6 @@ public sealed class TranslationSessionService : IAsyncDisposable
             room.LastClientPublishAtUtc = update.TimestampUtc;
             room.LastClientSourceText = update.SourceText;
             room.LastClientTranslatedText = update.TranslatedText;
-            room.ClientPayloadsForwarded += 1;
         }
         finally
         {
@@ -233,33 +224,8 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
         if (update is not null)
         {
-            try
-            {
-                await _hubContext.Clients.Group(roomId)
-                    .SendAsync("translationUpdate", update, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                await _gate.WaitAsync(cancellationToken);
-                try
-                {
-                    if (normalizedRoomId is not null && _rooms.TryGetValue(normalizedRoomId, out var room))
-                    {
-                        room.ClientPayloadSendErrors += 1;
-                    }
-                }
-                finally
-                {
-                    _gate.Release();
-                }
-
-                _logger.LogWarning(
-                    ex,
-                    "Hub broadcast failed for room={RoomId}, connection={ConnectionId}.",
-                    roomId,
-                    connectionId ?? "-");
-                throw;
-            }
+            await _hubContext.Clients.Group(roomId)
+                .SendAsync("translationUpdate", update, cancellationToken);
         }
     }
 
@@ -336,12 +302,6 @@ public sealed class TranslationSessionService : IAsyncDisposable
                 room.LastClientSourceText,
                 room.LastClientTranslatedText,
                 TranslationHub.GetRoomConnectionCount(room.RoomId),
-                room.LastClientPayloadReceivedAtUtc,
-                room.ClientPayloadsReceived,
-                room.ClientPayloadsForwarded,
-                room.ClientPayloadsDroppedNotRunning,
-                room.ClientPayloadsDroppedEmpty,
-                room.ClientPayloadSendErrors,
                 status.FreeMinutesUsed,
                 status.FreeMinutesRemaining,
                 DateTimeOffset.UtcNow);
@@ -1078,17 +1038,5 @@ public sealed class TranslationSessionService : IAsyncDisposable
         public string? LastClientSourceText { get; set; }
 
         public string? LastClientTranslatedText { get; set; }
-
-        public DateTimeOffset? LastClientPayloadReceivedAtUtc { get; set; }
-
-        public long ClientPayloadsReceived { get; set; }
-
-        public long ClientPayloadsForwarded { get; set; }
-
-        public long ClientPayloadsDroppedNotRunning { get; set; }
-
-        public long ClientPayloadsDroppedEmpty { get; set; }
-
-        public long ClientPayloadSendErrors { get; set; }
     }
 }
