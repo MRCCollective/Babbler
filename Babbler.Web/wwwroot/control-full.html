@@ -1,0 +1,2584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Babbler Control</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/assets/megaphone.svg" />
+    <style>
+        :root {
+            --bg: #081624;
+            --panel: #11253b;
+            --panel-soft: #193754;
+            --ink: #eef4fb;
+            --muted: #9fb5cc;
+            --accent: #ff7b29;
+            --danger: #db3c4c;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 20% 10%, #1b476b, transparent 35%),
+                radial-gradient(circle at 85% 90%, #572430, transparent 30%),
+                var(--bg);
+            padding: 2rem;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .panel {
+            background: rgba(17, 37, 59, 0.9);
+            border: 1px solid rgba(238, 244, 251, 0.12);
+            border-radius: 16px;
+            padding: 1.2rem;
+            backdrop-filter: blur(4px);
+        }
+
+        h1 {
+            margin: 0 0 0.5rem 0;
+            letter-spacing: 0.03em;
+        }
+
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .title-icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .access-box {
+            margin-top: 0.9rem;
+            border: 1px solid rgba(238, 244, 251, 0.14);
+            border-radius: 12px;
+            padding: 0.85rem;
+            background: rgba(10, 22, 36, 0.55);
+        }
+
+        .access-row {
+            display: flex;
+            gap: 0.65rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 0.4rem;
+        }
+
+        .access-value {
+            font-family: Consolas, monospace;
+            font-size: 0.95rem;
+            color: #d6e5f5;
+            word-break: break-all;
+        }
+
+        .access-pin {
+            font-family: Consolas, monospace;
+            font-size: 1.15rem;
+            letter-spacing: 0.08em;
+            color: #ffd2a7;
+            font-weight: 700;
+        }
+
+        .small-btn {
+            width: auto;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.8rem;
+        }
+
+        .icon-btn {
+            width: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.38rem;
+            border-radius: 8px;
+        }
+
+        .icon-btn svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
+
+        .grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            margin-top: 1rem;
+        }
+
+        .inline-row {
+            display: flex;
+            gap: 0.45rem;
+            align-items: stretch;
+        }
+
+        .inline-row select {
+            flex: 1;
+        }
+
+        .inline-row .small-btn {
+            flex: 0 0 auto;
+            margin: 0;
+            align-self: stretch;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 0.35rem;
+        }
+
+        select, button {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(238, 244, 251, 0.2);
+            background: var(--panel-soft);
+            color: var(--ink);
+            padding: 0.65rem 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        button {
+            cursor: pointer;
+            transition: transform 120ms ease, filter 120ms ease;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        .start {
+            background: var(--accent);
+            border-color: transparent;
+            color: #101010;
+            font-weight: 600;
+        }
+
+        .stop {
+            background: var(--danger);
+            border-color: transparent;
+            color: white;
+            font-weight: 600;
+        }
+
+        #status {
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .meter-row {
+            margin-top: 0.45rem;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .meter-label {
+            color: var(--muted);
+            font-size: 0.85rem;
+            min-width: 72px;
+        }
+
+        .meter-track {
+            flex: 1 1 220px;
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(238, 244, 251, 0.14);
+            overflow: hidden;
+            border: 1px solid rgba(238, 244, 251, 0.2);
+        }
+
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #27d87d, #ffe067, #ff7b29);
+            transition: width 80ms linear;
+        }
+
+        .meter-value {
+            color: #d6e5f5;
+            font-family: Consolas, monospace;
+            font-size: 0.82rem;
+            min-width: 58px;
+            text-align: right;
+        }
+
+        #log {
+            height: 260px;
+            overflow: auto;
+            background: #06101b;
+            border-radius: 10px;
+            padding: 0.8rem;
+            font-family: Consolas, monospace;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+
+        #debugLog {
+            height: 220px;
+            overflow: auto;
+            background: #020912;
+            border-radius: 10px;
+            padding: 0.8rem;
+            font-family: Consolas, monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            border: 1px solid rgba(238, 244, 251, 0.14);
+        }
+
+        .line {
+            margin: 0.28rem 0;
+            color: #d6e5f5;
+        }
+
+        .line.system {
+            color: #ffd2a7;
+        }
+
+        .line.debug {
+            color: #a6d8ff;
+        }
+
+        .line.debug.warn {
+            color: #ffd87a;
+        }
+
+        .line.debug.error {
+            color: #ffb8bf;
+        }
+
+        .rooms-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .rooms-head h2 {
+            margin: 0;
+        }
+
+        .rooms-grid {
+            display: grid;
+            gap: 0.8rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .rooms-column h3 {
+            margin: 0 0 0.45rem;
+            font-size: 0.95rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .rooms-list {
+            display: grid;
+            gap: 0.55rem;
+        }
+
+        .room-card {
+            border: 1px solid rgba(238, 244, 251, 0.12);
+            border-radius: 12px;
+            padding: 0.65rem;
+            background: rgba(8, 20, 34, 0.55);
+        }
+
+        .room-card.current {
+            border-color: rgba(255, 123, 41, 0.55);
+            box-shadow: 0 0 0 1px rgba(255, 123, 41, 0.28) inset;
+        }
+
+        .room-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .room-id {
+            font-family: Consolas, monospace;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            color: #ffd2a7;
+        }
+
+        .room-meta {
+            margin: 0.35rem 0 0;
+            color: #d6e5f5;
+            font-size: 0.84rem;
+        }
+
+        .pill {
+            border-radius: 999px;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+        }
+
+        .pill.running {
+            color: #0f2a13;
+            background: #9be39b;
+            border-color: #6fc66f;
+        }
+
+        .pill.stopped {
+            color: #4a3502;
+            background: #ffd87a;
+            border-color: #e0b348;
+        }
+
+        .room-actions {
+            margin-top: 0.5rem;
+            display: flex;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .room-actions button {
+            width: auto;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.8rem;
+        }
+
+        .ghost {
+            border-color: rgba(238, 244, 251, 0.25);
+            background: transparent;
+        }
+
+        .room-empty {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.86rem;
+            border: 1px dashed rgba(238, 244, 251, 0.18);
+            border-radius: 10px;
+            padding: 0.55rem 0.65rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="panel">
+            <div class="title-row">
+                <img class="title-icon" src="/assets/megaphone.svg" alt="Megaphone icon" />
+                <h1>Babbler POC Control</h1>
+            </div>
+            <p class="muted">Choose input language here. Target language is chosen on the display page.</p>
+            <p id="status">Session: checking...</p>
+            <p id="usage" class="muted">Free usage: checking...</p>
+            <div class="meter-row">
+                <span class="meter-label">Mic Level</span>
+                <div class="meter-track" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100">
+                    <div id="micLevelFill" class="meter-fill"></div>
+                </div>
+                <span id="micLevelValue" class="meter-value">0%</span>
+            </div>
+            <div class="access-box">
+                <p class="muted">Room ID</p>
+                <div class="access-row">
+                    <span id="roomId" class="access-pin">------</span>
+                    <button id="newRoomBtn" class="small-btn" type="button">New Room</button>
+                </div>
+                <p class="muted">Mobile Join URL</p>
+                <div class="access-row">
+                    <span id="joinUrl" class="access-value">Loading...</span>
+                    <button id="copyJoinUrlBtn" class="small-btn" type="button">Copy URL</button>
+                </div>
+                <p class="muted">PIN</p>
+                <div class="access-row">
+                    <span id="joinPin" class="access-pin">------</span>
+                    <button id="copyPinBtn" class="icon-btn" type="button" title="Copy PIN" aria-label="Copy PIN">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H10V7h9v14z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div>
+                    <label for="sourceLanguage">Source Language</label>
+                    <select id="sourceLanguage">
+                        <option value="en-US">English (US)</option>
+                        <option value="sv-SE">Swedish (Sweden)</option>
+                        <option value="es-ES">Spanish (Spain)</option>
+                        <option value="fr-FR">French (France)</option>
+                        <option value="de-DE">German (Germany)</option>
+                        <option value="it-IT">Italian (Italy)</option>
+                        <option value="ja-JP">Japanese (Japan)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="micInput">Microphone Input</label>
+                    <div class="inline-row">
+                        <select id="micInput"></select>
+                    </div>
+                </div>
+                <div>
+                    <label>Session Controls</label>
+                    <button class="start" id="startBtn" type="button">Start Translation</button>
+                </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button class="ghost" id="attachMicBtn" type="button">Attach Microphone</button>
+                </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button class="stop" id="stopBtn" type="button">Stop Translation</button>
+                </div>
+                <div>
+                    <label>Display Output</label>
+                    <button id="openDisplayBtn" type="button">Open Fullscreen Display</button>
+                </div>
+                <div>
+                    <label>&nbsp;</label>
+                    <button id="testCaptionBtn" class="ghost" type="button">Test Output</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="rooms-head">
+                <h2>Rooms</h2>
+                <button id="refreshRoomsBtn" class="small-btn" type="button">Refresh Rooms</button>
+            </div>
+            <p class="muted">Active rooms are listed live. Stopped rooms stay visible for 2 minutes.</p>
+            <div class="rooms-grid">
+                <div class="rooms-column">
+                    <h3>Active</h3>
+                    <div id="activeRooms" class="rooms-list"></div>
+                </div>
+                <div class="rooms-column">
+                    <h3>Recently Stopped</h3>
+                    <div id="recentRooms" class="rooms-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Live Feed</h2>
+            <div id="log"></div>
+        </section>
+
+        <section class="panel">
+            <div class="rooms-head">
+                <h2>Debug Output</h2>
+                <button id="clearDebugBtn" class="small-btn" type="button">Clear</button>
+            </div>
+            <div id="debugLog"></div>
+        </section>
+    </main>
+
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+    <script src="/lib/signalr/signalr.min.js"></script>
+    <script>
+        const statusEl = document.getElementById("status");
+        const usageEl = document.getElementById("usage");
+        const logEl = document.getElementById("log");
+        const debugLogEl = document.getElementById("debugLog");
+        const clearDebugBtn = document.getElementById("clearDebugBtn");
+        const roomIdEl = document.getElementById("roomId");
+        const newRoomBtn = document.getElementById("newRoomBtn");
+        const sourceLanguageEl = document.getElementById("sourceLanguage");
+        const joinUrlEl = document.getElementById("joinUrl");
+        const joinPinEl = document.getElementById("joinPin");
+        const copyJoinUrlBtn = document.getElementById("copyJoinUrlBtn");
+        const copyPinBtn = document.getElementById("copyPinBtn");
+        const startBtn = document.getElementById("startBtn");
+        const attachMicBtn = document.getElementById("attachMicBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const openDisplayBtn = document.getElementById("openDisplayBtn");
+        const testCaptionBtn = document.getElementById("testCaptionBtn");
+        const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
+        const activeRoomsEl = document.getElementById("activeRooms");
+        const recentRoomsEl = document.getElementById("recentRooms");
+        const micInputEl = document.getElementById("micInput");
+        const micLevelFillEl = document.getElementById("micLevelFill");
+        const micLevelValueEl = document.getElementById("micLevelValue");
+        const recentlyStoppedWindowMs = 2 * 60 * 1000;
+        let currentRoomId = "";
+        let currentJoinPin = "";
+        let currentJoinUrl = "";
+        let statusPollHandle = null;
+        let roomPollHandle = null;
+        let diagPollHandle = null;
+        let roomDiagPollHandle = null;
+        let connection = null;
+        let freeLimitReached = false;
+        let currentRoomIsRunning = false;
+        let currentRoomSourceLanguage = "en-US";
+        let currentRoomTargetLanguage = "en";
+        let browserRecognizer = null;
+        let browserRecognizerRoomId = "";
+        let micWatchdogHandle = null;
+        let lastMicActivityAt = 0;
+        let lastMicWarningAt = 0;
+        let roomRecoveryInProgress = false;
+        let lastPublishErrorAt = 0;
+        let micMeterAudioContext = null;
+        let micMeterStream = null;
+        let micMeterAnalyser = null;
+        let micMeterSource = null;
+        let micMeterFrameHandle = null;
+        let micActivityFrameHandle = null;
+        let micActivityAnimationEnabled = false;
+        let micActivityBoost = 0;
+        let selectedMicDeviceId = "";
+        let currentRecognitionDeviceId = "";
+        let currentRecognitionLanguage = "";
+        let micSwitchInProgress = false;
+        let recognizerRestartInProgress = false;
+        let lastRecognizerRestartAt = 0;
+        let micNoSpeechRecoveryInProgress = false;
+        let lastMicAutoFallbackAt = 0;
+        let sourceLanguageAutoFallbackUsed = false;
+        let lastRoomDiagStateSignature = "";
+        let lastRoomDiagWarningAt = 0;
+        let startRoomInProgress = false;
+        let recognizerActionQueue = Promise.resolve();
+        let wasHiddenDuringCapture = false;
+        let publishAttemptCount = 0;
+        let publishSuccessCount = 0;
+        let publishFailureCount = 0;
+        let lastDebugRecognizingAt = 0;
+        let lastPublishDebugAt = 0;
+        let lastRoomDiagDebugAt = 0;
+        let emptyAzureResultCount = 0;
+        let lastEmptyAzureWarningAt = 0;
+        let micMeterStartInProgress = false;
+        let currentRequestedTargetLanguages = [];
+        let lastMicPreflightLevelPercent = 0;
+        let statusPollIntervalMs = 0;
+        let roomPollIntervalMs = 0;
+        let roomDiagPollIntervalMs = 0;
+        let diagPollIntervalMs = 0;
+        const signalRClient = window.signalR;
+        const speechSdk = window.SpeechSDK;
+        const supportedTargetLanguages = ["en", "sv", "es", "fr", "de", "it", "ja"];
+        const defaultStartButtonLabel = startBtn.textContent || "Start Translation";
+        const useSystemDefaultMicForTranslation = false;
+        const disableMicMeterCaptureForTesting = true;
+
+        if (!signalRClient) {
+            statusEl.textContent = "Session: client library missing";
+            addLine("[error] SignalR client failed to load from /lib/signalr/signalr.min.js.", true);
+            throw new Error("SignalR client failed to load.");
+        }
+
+        if (!speechSdk) {
+            statusEl.textContent = "Session: speech library missing";
+            addLine("[error] Azure Speech JS SDK failed to load.", true);
+            throw new Error("Speech SDK failed to load.");
+        }
+
+        startBtn.addEventListener("click", async () => {
+            try {
+                await startRoom(currentRoomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to start session."}`, true);
+            }
+        });
+
+        attachMicBtn.addEventListener("click", async () => {
+            try {
+                await attachMicrophoneToRunningRoom(currentRoomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to attach microphone."}`, true);
+            }
+        });
+
+        stopBtn.addEventListener("click", async () => {
+            try {
+                await stopRoom(currentRoomId, "manual");
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to stop session."}`, true);
+            }
+        });
+
+        openDisplayBtn.addEventListener("click", () => {
+            try {
+                openDisplay();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to open display."}`, true);
+            }
+        });
+
+        testCaptionBtn.addEventListener("click", async () => {
+            try {
+                await sendTestCaption();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to send test output."}`, true);
+            }
+        });
+
+        refreshRoomsBtn.addEventListener("click", async () => {
+            try {
+                await refreshRooms();
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to load rooms."}`, true);
+            }
+        });
+
+        clearDebugBtn.addEventListener("click", () => {
+            debugLogEl.replaceChildren();
+            addDebugLine("debug log cleared");
+        });
+
+        micInputEl.addEventListener("change", async () => {
+            const requestedMicDeviceId = getSelectedMicDeviceId();
+
+            if (micSwitchInProgress) {
+                return;
+            }
+
+            micSwitchInProgress = true;
+            try {
+                await ensureMicrophonePermission();
+                await refreshMicrophoneDevices(true);
+
+                if (requestedMicDeviceId &&
+                    Array.from(micInputEl.options).some(option => option.value === requestedMicDeviceId))
+                {
+                    micInputEl.value = requestedMicDeviceId;
+                }
+
+                selectedMicDeviceId = getSelectedMicDeviceId();
+                const selectedLabel = getSelectedMicLabel();
+                addLine(`[system] Mic input selected: ${selectedLabel}`, true);
+                addDebugLine(`mic selected label="${selectedLabel}" deviceId="${selectedMicDeviceId || "default"}"`);
+
+                if (browserRecognizer && browserRecognizerRoomId) {
+                    if (useSystemDefaultMicForTranslation) {
+                        addLine("[system] Translation uses system default microphone while running.", true);
+                        return;
+                    }
+
+                    addLine("[system] Applying microphone change...", true);
+                    await startBrowserRecognition(browserRecognizerRoomId, sourceLanguageEl.value);
+                    addLine(`[system] Microphone switched to "${selectedLabel}".`, true);
+                    return;
+                }
+
+                stopMicLevelMeter();
+                if (disableMicMeterCaptureForTesting) {
+                    setMicLevel(0);
+                    return;
+                }
+                await startMicLevelMeter(selectedMicDeviceId);
+            } catch (err) {
+                addLine(`[error] Unable to switch microphone now: ${err?.message || err}`, true);
+            } finally {
+                micSwitchInProgress = false;
+            }
+        });
+
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
+            navigator.mediaDevices.addEventListener("devicechange", () => {
+                refreshMicrophoneDevices(true).catch(() => {
+                    // Ignore transient media device change errors.
+                });
+            });
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            applyPollingSchedule();
+
+            if (!browserRecognizer) {
+                return;
+            }
+
+            if (document.hidden) {
+                wasHiddenDuringCapture = true;
+                addLine("[system] Control tab is in background. Keep this tab active while capturing microphone.", true);
+                addDebugLine("visibility change: hidden while recognizer active", "warn");
+                return;
+            }
+
+            if (!wasHiddenDuringCapture) {
+                return;
+            }
+
+            wasHiddenDuringCapture = false;
+            addLine("[system] Control tab active again.", true);
+            addDebugLine("visibility change: visible");
+        });
+
+        newRoomBtn.addEventListener("click", async () => {
+            newRoomBtn.disabled = true;
+            try {
+                const room = await createRoom();
+                addLine(`[system] New room created: ${room.roomId}`, true);
+                await switchRoom(room.roomId);
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to create room."}`, true);
+            } finally {
+                newRoomBtn.disabled = false;
+            }
+        });
+
+        copyJoinUrlBtn.addEventListener("click", async () => {
+            if (!currentJoinUrl) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentJoinUrl);
+                addLine("[system] Join URL copied to clipboard.", true);
+            } catch {
+                addLine("[error] Clipboard copy failed.", true);
+            }
+        });
+
+        copyPinBtn.addEventListener("click", async () => {
+            if (!currentJoinPin) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentJoinPin);
+                addLine("[system] PIN copied to clipboard.", true);
+            } catch {
+                addLine("[error] Clipboard copy failed.", true);
+            }
+        });
+
+        function addLine(text, isSystem = false) {
+            const line = document.createElement("p");
+            line.className = isSystem ? "line system" : "line";
+            line.textContent = text;
+            logEl.prepend(line);
+        }
+
+        function addDebugLine(text, level = "info") {
+            const line = document.createElement("p");
+            line.className = `line debug${level === "info" ? "" : ` ${level}`}`;
+            const timestamp = new Date().toLocaleTimeString();
+            line.textContent = `[${timestamp}] ${text}`;
+            debugLogEl.appendChild(line);
+
+            while (debugLogEl.childElementCount > 500) {
+                debugLogEl.removeChild(debugLogEl.firstChild);
+            }
+
+            debugLogEl.scrollTop = debugLogEl.scrollHeight;
+        }
+
+        function updateStatus(state) {
+            freeLimitReached = Boolean(state.freeLimitReached);
+            currentRoomIsRunning = Boolean(state.isRunning);
+            if (state.sourceLanguage) {
+                currentRoomSourceLanguage = state.sourceLanguage;
+            }
+            if (state.targetLanguage) {
+                currentRoomTargetLanguage = state.targetLanguage;
+            }
+
+            const running = state.isRunning ? "running" : "stopped";
+            const languages = state.sourceLanguage && state.targetLanguage
+                ? ` (${state.sourceLanguage} -> ${state.targetLanguage})`
+                : "";
+            const roomLabel = currentRoomId ? ` (${currentRoomId})` : "";
+            statusEl.textContent = `Session${roomLabel}: ${running}${languages}`;
+
+            const used = formatMinutes(state.freeMinutesUsed);
+            const limit = formatMinutes(state.freeMinutesLimit);
+            const remaining = formatMinutes(state.freeMinutesRemaining);
+            const blocked = state.freeLimitReached ? " (limit reached)" : "";
+            usageEl.textContent = `Free usage: ${used} / ${limit} min used, ${remaining} min left${blocked}`;
+
+            const hasLocalCapture = Boolean(browserRecognizer && browserRecognizerRoomId === currentRoomId);
+            startBtn.disabled = freeLimitReached || currentRoomIsRunning;
+            startBtn.textContent = defaultStartButtonLabel;
+
+            const showAttachButton = state.isRunning && !hasLocalCapture;
+            attachMicBtn.style.display = showAttachButton ? "" : "none";
+            attachMicBtn.disabled = !showAttachButton;
+
+            stopBtn.disabled = !state.isRunning;
+            if (useSystemDefaultMicForTranslation) {
+                micInputEl.disabled = Boolean(state.isRunning);
+            }
+            if (!state.isRunning && !browserRecognizer) {
+                ensureIdleMicMeterStarted().catch(() => {
+                    // Ignore idle meter startup errors.
+                });
+            }
+            applyPollingSchedule();
+        }
+
+        function formatMinutes(value) {
+            const numeric = Number(value);
+            if (Number.isNaN(numeric)) {
+                return "0.00";
+            }
+
+            return numeric.toFixed(2);
+        }
+
+        function roomApiBase(roomId = currentRoomId) {
+            if (!roomId) {
+                throw new Error("No room selected.");
+            }
+
+            return `/api/rooms/${encodeURIComponent(roomId)}`;
+        }
+
+        function getRoomIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return (params.get("roomId") || "").trim().toUpperCase();
+        }
+
+        function setRoomIdInQuery(roomId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("roomId", roomId);
+            window.history.replaceState({}, "", url);
+        }
+
+        async function refreshStatus() {
+            const response = await fetchJson(`${roomApiBase()}/session/status`);
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            updateStatus(response.data);
+
+            if (!response.data?.isRunning && browserRecognizerRoomId === currentRoomId) {
+                await stopBrowserRecognition();
+            }
+        }
+
+        async function refreshAccessInfo() {
+            const response = await fetchJson(`${roomApiBase()}/access-info`);
+            if (!response.ok) {
+                if (isRoomNotFoundError(response.errorMessage)) {
+                    await recoverFromMissingRoom("Room access info not found.");
+                    return;
+                }
+
+                throw new Error(response.errorMessage);
+            }
+
+            currentRoomId = response.data?.roomId || currentRoomId;
+            currentJoinPin = response.data?.pin || "";
+            currentJoinUrl = response.data?.joinUrl || "";
+
+            roomIdEl.textContent = currentRoomId || "------";
+            joinPinEl.textContent = currentJoinPin || "------";
+            joinUrlEl.textContent = currentJoinUrl || "Unavailable";
+        }
+
+        async function createRoom() {
+            const response = await fetchJson("/api/rooms", {
+                method: "POST"
+            });
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            return response.data;
+        }
+
+        async function refreshRooms() {
+            const response = await fetchJson("/api/rooms");
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            const rooms = Array.isArray(response.data) ? response.data : [];
+            const activeRooms = rooms.filter(room => room.isRunning);
+            const recentlyStoppedRooms = rooms.filter(room =>
+                !room.isRunning && isRecentlyStopped(room));
+
+            renderRoomList(activeRoomsEl, activeRooms, true, "No active rooms.");
+            renderRoomList(recentRoomsEl, recentlyStoppedRooms, false, "No recently stopped rooms.");
+        }
+
+        function isRecentlyStopped(room) {
+            if (!room || !room.lastStoppedAtUtc) {
+                return false;
+            }
+
+            const stoppedAt = Date.parse(room.lastStoppedAtUtc);
+            if (Number.isNaN(stoppedAt)) {
+                return false;
+            }
+
+            return Date.now() - stoppedAt <= recentlyStoppedWindowMs;
+        }
+
+        function renderRoomList(container, rooms, isActiveList, emptyMessage) {
+            container.replaceChildren();
+
+            if (!rooms.length) {
+                const empty = document.createElement("p");
+                empty.className = "room-empty";
+                empty.textContent = emptyMessage;
+                container.appendChild(empty);
+                return;
+            }
+
+            for (const room of rooms) {
+                container.appendChild(buildRoomCard(room, isActiveList));
+            }
+        }
+
+        function buildRoomCard(room, isActiveList) {
+            const card = document.createElement("article");
+            card.className = "room-card";
+            if (room.roomId === currentRoomId) {
+                card.classList.add("current");
+            }
+
+            const top = document.createElement("div");
+            top.className = "room-top";
+
+            const roomId = document.createElement("span");
+            roomId.className = "room-id";
+            roomId.textContent = room.roomId;
+
+            const pill = document.createElement("span");
+            pill.className = `pill ${room.isRunning ? "running" : "stopped"}`;
+            pill.textContent = room.isRunning ? "Running" : "Stopped";
+
+            top.appendChild(roomId);
+            top.appendChild(pill);
+            card.appendChild(top);
+
+            const meta = document.createElement("p");
+            meta.className = "room-meta";
+            meta.textContent = describeRoomLanguage(room);
+            card.appendChild(meta);
+
+            const actions = document.createElement("div");
+            actions.className = "room-actions";
+
+            actions.appendChild(makeActionButton("Select", "ghost", async () => {
+                await switchRoom(room.roomId);
+            }));
+
+            actions.appendChild(makeActionButton("Open", "ghost", async () => {
+                openDisplay(room.roomId);
+            }));
+
+            if (isActiveList) {
+                actions.appendChild(makeActionButton("Stop", "stop", async () => {
+                    await stopRoom(room.roomId, "manual");
+                }));
+            } else {
+                const startButton = makeActionButton("Start", "start", async () => {
+                    await startRoom(room.roomId);
+                });
+                startButton.disabled = freeLimitReached;
+                actions.appendChild(startButton);
+            }
+
+            card.appendChild(actions);
+            return card;
+        }
+
+        function describeRoomLanguage(room) {
+            if (room.sourceLanguage && room.targetLanguage) {
+                return `${room.sourceLanguage} -> ${room.targetLanguage}`;
+            }
+
+            if (room.targetLanguage) {
+                return `target ${room.targetLanguage}`;
+            }
+
+            return "no language selected yet";
+        }
+
+        function makeActionButton(label, className, action) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = className;
+            button.textContent = label;
+            button.addEventListener("click", async () => {
+                if (button.disabled) {
+                    return;
+                }
+
+                button.disabled = true;
+                try {
+                    await action();
+                } catch (err) {
+                    addLine(`[error] ${err.message || "Action failed."}`, true);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+
+            return button;
+        }
+
+        async function getSpeechToken() {
+            const response = await fetchJson("/api/speech/token");
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            const token = response.data?.token;
+            const region = response.data?.region;
+            if (!token || !region) {
+                throw new Error("Speech token response was invalid.");
+            }
+
+            return { token, region };
+        }
+
+        function getSelectedMicDeviceId() {
+            return normalizeMicDeviceId(micInputEl.value);
+        }
+
+        function getSelectedMicLabel() {
+            const option = micInputEl.options[micInputEl.selectedIndex];
+            return option?.textContent?.trim() || "Default microphone";
+        }
+
+        function canonicalizeMicLabel(label) {
+            let value = (label || "").trim().toLowerCase();
+            while (value.startsWith("default - ")) {
+                value = value.slice("default - ".length).trim();
+            }
+            return value;
+        }
+
+        function getMicLabelForDeviceId(deviceId) {
+            if (!deviceId) {
+                return getSelectedMicLabel();
+            }
+
+            const normalizedDeviceId = normalizeMicDeviceId(deviceId);
+            const option = Array.from(micInputEl.options).find(item =>
+                normalizeMicDeviceId(item.value) === normalizedDeviceId);
+            return option?.textContent?.trim() || getSelectedMicLabel();
+        }
+
+        function resolveDefaultAliasMicDeviceId() {
+            const selectedId = getSelectedMicDeviceId();
+            if (selectedId) {
+                return selectedId;
+            }
+
+            const selectedCanonicalLabel = canonicalizeMicLabel(getSelectedMicLabel());
+            if (!selectedCanonicalLabel) {
+                return "";
+            }
+
+            const match = Array.from(micInputEl.options).find(option => {
+                const optionDeviceId = normalizeMicDeviceId(option.value);
+                if (!optionDeviceId) {
+                    return false;
+                }
+
+                const optionCanonicalLabel = canonicalizeMicLabel(option.textContent || "");
+                if (!optionCanonicalLabel) {
+                    return false;
+                }
+
+                return optionCanonicalLabel === selectedCanonicalLabel ||
+                    optionCanonicalLabel.includes(selectedCanonicalLabel) ||
+                    selectedCanonicalLabel.includes(optionCanonicalLabel);
+            });
+
+            return normalizeMicDeviceId(match?.value || "");
+        }
+
+        function normalizeMicDeviceId(value) {
+            const normalized = (value || "").trim();
+            if (!normalized ||
+                normalized.toLowerCase() === "default" ||
+                normalized.toLowerCase() === "communications")
+            {
+                return "";
+            }
+
+            return normalized;
+        }
+
+        async function refreshMicrophoneDevices(preserveSelection) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                micInputEl.innerHTML = "";
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "Microphone selection unsupported";
+                micInputEl.appendChild(option);
+                micInputEl.disabled = true;
+                selectedMicDeviceId = "";
+                return;
+            }
+
+            const previousValue = preserveSelection ? getSelectedMicDeviceId() : "";
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const defaultDevice = devices.find(device =>
+                device.kind === "audioinput" &&
+                (device.deviceId || "").toLowerCase() === "default");
+            const microphones = devices.filter(device =>
+                device.kind === "audioinput" &&
+                normalizeMicDeviceId(device.deviceId));
+
+            micInputEl.innerHTML = "";
+
+            const defaultOption = document.createElement("option");
+            defaultOption.value = "";
+            defaultOption.textContent = defaultDevice?.label
+                ? `Default - ${defaultDevice.label}`
+                : "System default microphone";
+            micInputEl.appendChild(defaultOption);
+
+            microphones.forEach((device, index) => {
+                const option = document.createElement("option");
+                option.value = normalizeMicDeviceId(device.deviceId);
+                option.textContent = device.label || `Microphone ${index + 1}`;
+                micInputEl.appendChild(option);
+            });
+
+            const canRestore = previousValue &&
+                Array.from(micInputEl.options).some(option => option.value === previousValue);
+            micInputEl.value = canRestore ? previousValue : "";
+            selectedMicDeviceId = getSelectedMicDeviceId();
+            micInputEl.disabled = false;
+        }
+
+        async function ensureMicrophonePermission() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                addDebugLine("getUserMedia unavailable in this browser", "warn");
+                return;
+            }
+
+            let stream = null;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                addDebugLine("microphone permission confirmed");
+            } finally {
+                if (stream) {
+                    for (const track of stream.getTracks()) {
+                        track.stop();
+                    }
+                }
+            }
+        }
+
+        function createSpeechAudioConfig(deviceId) {
+            if (deviceId && typeof speechSdk.AudioConfig.fromMicrophoneInput === "function") {
+                try {
+                    return speechSdk.AudioConfig.fromMicrophoneInput(deviceId);
+                } catch (err) {
+                    addLine(`[error] Selected mic could not be opened. Falling back to default. (${err?.message || err})`, true);
+                }
+            }
+
+            return speechSdk.AudioConfig.fromDefaultMicrophoneInput();
+        }
+
+        function buildTranslationRecognizer(speechConfig, audioConfig, roomId, sourceLanguage) {
+            const recognizer = new speechSdk.TranslationRecognizer(
+                speechConfig,
+                audioConfig);
+
+            recognizer.recognizing = (_, event) => {
+                const translations = extractResultTranslations(event?.result);
+                if (event?.result?.text) {
+                    lastMicActivityAt = Date.now();
+                    noteMicSpeechActivity(false);
+                    if (Date.now() - lastDebugRecognizingAt > 3000) {
+                        lastDebugRecognizingAt = Date.now();
+                        addDebugLine(`recognizing partial chars=${event.result.text.length}`);
+                    }
+                }
+                publishRecognitionResult(sourceLanguage, false, event?.result, translations);
+            };
+
+            recognizer.recognized = (_, event) => {
+                const reason = event?.result?.reason;
+                const reasonName = getResultReasonName(reason);
+                const translations = extractResultTranslations(event?.result);
+                const translationKeys = Object.keys(translations);
+                const sourceText = (event?.result?.text || "").trim();
+                const serviceJson = getSpeechServiceResultJson(event?.result);
+                const isAzureEmptyTranslation =
+                    reason === speechSdk.ResultReason.TranslatedSpeech &&
+                    !sourceText &&
+                    translationKeys.length === 0;
+
+                if (isAzureEmptyTranslation) {
+                    emptyAzureResultCount += 1;
+                    lastMicActivityAt = Date.now();
+                }
+
+                addDebugLine(
+                    `recognized reason=${reasonName}(${reason ?? "?"}) sourceChars=${sourceText.length} keys=${translationKeys.join(",") || "-"} emptyAzureCount=${emptyAzureResultCount}`);
+                if (isAzureEmptyTranslation && serviceJson) {
+                    addDebugLine(
+                        `recognized raw json fields: ${Object.keys(serviceJson).join(",") || "-"}`,
+                        "warn");
+                    const rawStatus = (serviceJson.RecognitionStatus || "").toString();
+                    const rawDisplayTextLength = (serviceJson.DisplayText || "").toString().trim().length;
+                    const rawTextLength = (serviceJson.Text || "").toString().trim().length;
+                    const translationValue = serviceJson.Translation;
+                    const translationType = Array.isArray(translationValue)
+                        ? "array"
+                        : typeof translationValue;
+                    const translationKeys = translationValue && typeof translationValue === "object"
+                        ? Object.keys(translationValue).join(",")
+                        : "-";
+                    const translationStatus = translationValue && typeof translationValue === "object"
+                        ? (translationValue.TranslationStatus || translationValue.translationStatus || "-")
+                        : "-";
+                    const nestedTranslations = translationValue && typeof translationValue === "object"
+                        ? translationValue.Translations
+                        : null;
+                    const nestedTranslationKeys = nestedTranslations && typeof nestedTranslations === "object"
+                        ? Object.keys(nestedTranslations).join(",")
+                        : "-";
+                    addDebugLine(
+                        `recognized raw json summary: status=${rawStatus || "-"} displayChars=${rawDisplayTextLength} textChars=${rawTextLength} translationType=${translationType} translationStatus=${translationStatus} translationKeys=${translationKeys || "-"} nestedKeys=${nestedTranslationKeys || "-"}`,
+                        "warn");
+                    if (nestedTranslations && typeof nestedTranslations === "object") {
+                        const preview = JSON.stringify(nestedTranslations).slice(0, 220);
+                        addDebugLine(`recognized raw translation preview: ${preview}`, "warn");
+                    }
+                }
+
+                if (sourceText) {
+                    lastMicActivityAt = Date.now();
+                    noteMicSpeechActivity(true);
+                    addLine(`[mic-final] ${sourceText}`);
+                    addDebugLine(`recognized final chars=${sourceText.length}`);
+                } else if (translationKeys.length > 0) {
+                    lastMicActivityAt = Date.now();
+                    addDebugLine(
+                        `recognized translated-only result keys=${translationKeys.join(",")}`,
+                        "warn");
+                } else if (reason === speechSdk.ResultReason.NoMatch && event?.result) {
+                    const noMatch = speechSdk.NoMatchDetails.fromResult(event.result);
+                    addLine("[error] Speech heard but not recognized (no-match).", true);
+                    addDebugLine(
+                        `recognized no-match reason=${noMatch?.reason || "unknown"}`,
+                        "warn");
+                } else {
+                    addDebugLine(`recognized with no text reason=${reason ?? "unknown"}`, "warn");
+                }
+
+                if (isAzureEmptyTranslation) {
+                    const now = Date.now();
+                    if (now - lastEmptyAzureWarningAt > 7000) {
+                        lastEmptyAzureWarningAt = now;
+                        addLine(
+                            `[error] Azure Speech returned an empty translated result (${emptyAzureResultCount}). Check mic source, speech clarity, and source language.`,
+                            true);
+                    }
+                }
+
+                publishRecognitionResult(sourceLanguage, true, event?.result, translations);
+            };
+
+            recognizer.speechStartDetected = () => {
+                lastMicActivityAt = Date.now();
+                addDebugLine("speech start detected");
+            };
+
+            recognizer.speechEndDetected = () => {
+                addDebugLine("speech end detected");
+            };
+
+            recognizer.sessionStarted = () => {
+                addDebugLine(`speech session started room=${roomId} source=${sourceLanguage}`);
+            };
+
+            recognizer.sessionStopped = () => {
+                addLine("[system] Speech session stopped.", true);
+                addDebugLine("speech session stopped", "warn");
+
+                if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
+                    return;
+                }
+                addLine("[system] Recognition session ended. Click Start Translation to resume.", true);
+            };
+
+            recognizer.canceled = (_, event) => {
+                const details = event?.errorDetails ? ` (${event.errorDetails})` : "";
+                addLine(`[error] Speech canceled: ${event?.reason || "unknown"}${details}`, true);
+                addDebugLine(`speech canceled reason=${event?.reason || "unknown"} details=${event?.errorDetails || "-"}`, "error");
+
+                if (browserRecognizer !== recognizer || browserRecognizerRoomId !== roomId) {
+                    return;
+                }
+                addLine("[system] Recognition canceled. Click Start Translation to retry.", true);
+            };
+
+            return recognizer;
+        }
+
+        function toPromise(startOrStop) {
+            return new Promise((resolve, reject) => {
+                startOrStop(resolve, reject);
+            });
+        }
+
+        function queueRecognizerAction(actionName, action) {
+            const run = async () => {
+                addDebugLine(`recognizer action begin: ${actionName}`);
+                try {
+                    return await action();
+                } finally {
+                    addDebugLine(`recognizer action end: ${actionName}`);
+                }
+            };
+
+            const next = recognizerActionQueue.then(run, run);
+            recognizerActionQueue = next.catch(() => {
+                // Keep the queue alive after failures.
+            });
+            return next;
+        }
+
+        function getSourceLanguageFallback(sourceLanguage) {
+            if (sourceLanguage === "en-US") {
+                return "sv-SE";
+            }
+
+            if (sourceLanguage === "sv-SE") {
+                return "en-US";
+            }
+
+            return "";
+        }
+
+        async function startBrowserRecognition(roomId, sourceLanguage) {
+            return queueRecognizerAction(
+                `start room=${roomId} source=${sourceLanguage}`,
+                async () => await startBrowserRecognitionCore(roomId, sourceLanguage));
+        }
+
+        async function startBrowserRecognitionCore(roomId, sourceLanguage) {
+            if (!connection) {
+                throw new Error("SignalR connection is not ready.");
+            }
+
+            if (browserRecognizer) {
+                await stopBrowserRecognitionCore(false);
+            }
+            stopMicLevelMeter();
+
+            const speechToken = await getSpeechToken();
+            const speechConfig = speechSdk.SpeechTranslationConfig
+                .fromAuthorizationToken(speechToken.token, speechToken.region);
+            speechConfig.speechRecognitionLanguage = sourceLanguage;
+            const requestedTargetLanguages = Array.from(
+                new Set(
+                    [...supportedTargetLanguages, currentRoomTargetLanguage]
+                        .map(value => (value || "").trim().toLowerCase())
+                        .filter(Boolean)));
+            currentRequestedTargetLanguages = requestedTargetLanguages;
+
+            for (const targetLanguage of requestedTargetLanguages) {
+                try {
+                    speechConfig.addTargetLanguage(targetLanguage);
+                } catch (err) {
+                    addDebugLine(
+                        `target language skipped by SDK: ${targetLanguage} (${err?.message || err})`,
+                        "warn");
+                }
+            }
+
+            const selectedDeviceId = useSystemDefaultMicForTranslation
+                ? ""
+                : resolveDefaultAliasMicDeviceId();
+            const selectedDeviceLabel = useSystemDefaultMicForTranslation
+                ? "System default microphone"
+                : getMicLabelForDeviceId(selectedDeviceId);
+            if (!useSystemDefaultMicForTranslation && !getSelectedMicDeviceId() && selectedDeviceId) {
+                addLine(`[system] Default mic mapped to "${selectedDeviceLabel}" for reliability.`, true);
+            }
+            addDebugLine(
+                `start recognizer room=${roomId} source=${sourceLanguage} device=${selectedDeviceId || "default"} visible=${!document.hidden}`);
+            let recognizer = buildTranslationRecognizer(
+                speechConfig,
+                createSpeechAudioConfig(selectedDeviceId),
+                roomId,
+                sourceLanguage);
+            let activeDeviceId = selectedDeviceId;
+            let activeDeviceLabel = selectedDeviceLabel;
+            try {
+                await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
+            } catch (err) {
+                recognizer.close();
+
+                if (!selectedDeviceId) {
+                    throw new Error(`Microphone start failed: ${err?.message || err || "unknown error"}`);
+                }
+
+                addLine(
+                    `[error] Selected microphone failed to start. Retrying system default. (${err?.message || err || "unknown error"})`,
+                    true);
+
+                activeDeviceId = "";
+                activeDeviceLabel = "System default microphone";
+                selectedMicDeviceId = "";
+                micInputEl.value = "";
+
+                recognizer = buildTranslationRecognizer(
+                    speechConfig,
+                    speechSdk.AudioConfig.fromDefaultMicrophoneInput(),
+                    roomId,
+                    sourceLanguage);
+
+                try {
+                    await toPromise((ok, fail) => recognizer.startContinuousRecognitionAsync(ok, fail));
+                } catch (retryErr) {
+                    recognizer.close();
+                    throw new Error(
+                        `Microphone start failed after fallback: ${retryErr?.message || retryErr || "unknown error"}`);
+                }
+            }
+
+            browserRecognizer = recognizer;
+            browserRecognizerRoomId = roomId;
+            currentRecognitionDeviceId = activeDeviceId;
+            currentRecognitionLanguage = sourceLanguage;
+            emptyAzureResultCount = 0;
+            lastEmptyAzureWarningAt = 0;
+            lastMicActivityAt = Date.now();
+            lastMicWarningAt = 0;
+            startMicWatchdog();
+            startMicActivityAnimation();
+            await refreshMicrophoneDevices(true);
+            if (activeDeviceId &&
+                Array.from(micInputEl.options).some(option => option.value === activeDeviceId))
+            {
+                micInputEl.value = activeDeviceId;
+            }
+            addLine("[system] Mic level meter paused during active translation.", true);
+            addLine(`[system] Microphone active (${sourceLanguage} -> room target) using "${activeDeviceLabel}".`, true);
+            addDebugLine(`recognizer active source=${sourceLanguage} mic="${activeDeviceLabel}"`);
+        }
+
+        async function stopBrowserRecognition(restartMeter = true) {
+            return queueRecognizerAction(
+                `stop restartMeter=${restartMeter}`,
+                async () => await stopBrowserRecognitionCore(restartMeter));
+        }
+
+        async function stopBrowserRecognitionCore(restartMeter = true) {
+            if (!browserRecognizer) {
+                browserRecognizerRoomId = "";
+                currentRecognitionDeviceId = "";
+                currentRecognitionLanguage = "";
+                stopMicActivityAnimation();
+                if (restartMeter) {
+                    await startMicLevelMeter(getSelectedMicDeviceId());
+                }
+                return;
+            }
+
+            const recognizer = browserRecognizer;
+            browserRecognizer = null;
+            browserRecognizerRoomId = "";
+            currentRecognitionDeviceId = "";
+            currentRecognitionLanguage = "";
+            addDebugLine("stopping recognizer");
+            stopMicWatchdog();
+            stopMicActivityAnimation();
+            stopMicLevelMeter();
+
+            try {
+                await toPromise((ok, fail) => recognizer.stopContinuousRecognitionAsync(ok, fail));
+            } catch {
+                // Ignore recognizer stop errors.
+            }
+
+            recognizer.close();
+            if (restartMeter) {
+                await startMicLevelMeter(getSelectedMicDeviceId());
+            }
+        }
+
+        function startMicWatchdog() {
+            stopMicWatchdog();
+            micWatchdogHandle = setInterval(() => {
+                if (!browserRecognizer) {
+                    return;
+                }
+
+                const now = Date.now();
+                if (now - lastMicActivityAt < 15000) {
+                    return;
+                }
+
+                if (now - lastMicWarningAt < 15000) {
+                    return;
+                }
+
+                lastMicWarningAt = now;
+                addLine("[error] No recognizable speech detected yet. Check source language, speech clarity, and mic distance.", true);
+                addDebugLine("watchdog: no recognizable speech for >15s", "warn");
+            }, 5000);
+        }
+
+        function stopMicWatchdog() {
+            if (micWatchdogHandle !== null) {
+                clearInterval(micWatchdogHandle);
+                micWatchdogHandle = null;
+            }
+        }
+
+        async function startMicLevelMeter(deviceId) {
+            if (disableMicMeterCaptureForTesting) {
+                setMicLevel(0);
+                return;
+            }
+
+            if (micMeterAnalyser) {
+                return;
+            }
+
+            stopMicActivityAnimation(false);
+
+            try {
+                const resolvedDeviceId = normalizeMicDeviceId(deviceId) || resolveDefaultAliasMicDeviceId();
+                const audioConstraint = resolvedDeviceId
+                    ? { deviceId: { exact: resolvedDeviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+                let stream = null;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: false });
+                } catch {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                }
+
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024;
+                analyser.smoothingTimeConstant = 0.82;
+
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                micMeterStream = stream;
+                micMeterAudioContext = audioContext;
+                micMeterAnalyser = analyser;
+                micMeterSource = source;
+
+                runMicMeterFrame();
+            } catch (err) {
+                addLine(`[error] Mic meter unavailable: ${err?.message || err}`, true);
+            }
+        }
+
+        async function runMicSignalPreflight(deviceId) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return 0;
+            }
+
+            const resolvedDeviceId = normalizeMicDeviceId(deviceId) || resolveDefaultAliasMicDeviceId();
+            const audioConstraint = resolvedDeviceId
+                ? { deviceId: { exact: resolvedDeviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+            let stream = null;
+            let audioContext = null;
+            let analyser = null;
+            let source = null;
+
+            try {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: false });
+                } catch {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                }
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024;
+                analyser.smoothingTimeConstant = 0.82;
+
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.fftSize);
+                const startedAt = Date.now();
+                let maxPercent = 0;
+
+                while (Date.now() - startedAt < 900) {
+                    analyser.getByteTimeDomainData(dataArray);
+                    let sumSquares = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        const centered = (dataArray[i] - 128) / 128;
+                        sumSquares += centered * centered;
+                    }
+
+                    const rms = Math.sqrt(sumSquares / dataArray.length);
+                    const percent = Math.max(0, Math.min(100, Math.round(rms * 240)));
+                    if (percent > maxPercent) {
+                        maxPercent = percent;
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 60));
+                }
+
+                lastMicPreflightLevelPercent = maxPercent;
+                addDebugLine(`mic preflight peak=${maxPercent}% device=${resolvedDeviceId || "default"}`);
+                if (maxPercent <= 2) {
+                    addLine(
+                        "[error] Mic preflight is very low. Speak closer or select another input before starting.",
+                        true);
+                }
+
+                return maxPercent;
+            } catch (err) {
+                addDebugLine(`mic preflight failed: ${err?.message || err}`, "warn");
+                return 0;
+            } finally {
+                if (source) {
+                    try {
+                        source.disconnect();
+                    } catch {
+                        // Ignore disconnect errors.
+                    }
+                }
+
+                if (stream) {
+                    for (const track of stream.getTracks()) {
+                        track.stop();
+                    }
+                }
+
+                if (audioContext) {
+                    try {
+                        await audioContext.close();
+                    } catch {
+                        // Ignore close errors.
+                    }
+                }
+            }
+        }
+
+        function stopMicLevelMeter() {
+            if (micMeterFrameHandle !== null) {
+                cancelAnimationFrame(micMeterFrameHandle);
+                micMeterFrameHandle = null;
+            }
+
+            if (micMeterSource) {
+                try {
+                    micMeterSource.disconnect();
+                } catch {
+                    // Ignore disconnect errors.
+                }
+                micMeterSource = null;
+            }
+
+            if (micMeterStream) {
+                for (const track of micMeterStream.getTracks()) {
+                    track.stop();
+                }
+                micMeterStream = null;
+            }
+
+            if (micMeterAudioContext) {
+                micMeterAudioContext.close().catch(() => {
+                    // Ignore close errors.
+                });
+                micMeterAudioContext = null;
+            }
+
+            micMeterAnalyser = null;
+            setMicLevel(0);
+        }
+
+        function runMicMeterFrame() {
+            if (!micMeterAnalyser) {
+                setMicLevel(0);
+                return;
+            }
+
+            const bufferLength = micMeterAnalyser.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+            micMeterAnalyser.getByteTimeDomainData(dataArray);
+
+            let sumSquares = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const centered = (dataArray[i] - 128) / 128;
+                sumSquares += centered * centered;
+            }
+
+            const rms = Math.sqrt(sumSquares / bufferLength);
+            const percent = Math.max(0, Math.min(100, Math.round(rms * 240)));
+            setMicLevel(percent);
+
+            micMeterFrameHandle = requestAnimationFrame(runMicMeterFrame);
+        }
+
+        function noteMicSpeechActivity(isStrong) {
+            // Meter is paused while translation is active.
+            // Keep this as a no-op to avoid synthetic pulsing.
+        }
+
+        function startMicActivityAnimation() {
+            stopMicActivityAnimation(false);
+            micActivityAnimationEnabled = false;
+            micActivityBoost = 0;
+            setMicLevel(0);
+        }
+
+        function stopMicActivityAnimation(resetMeter = true) {
+            micActivityAnimationEnabled = false;
+            micActivityBoost = 0;
+
+            if (micActivityFrameHandle !== null) {
+                cancelAnimationFrame(micActivityFrameHandle);
+                micActivityFrameHandle = null;
+            }
+
+            if (resetMeter) {
+                setMicLevel(0);
+            }
+        }
+
+        function setMicLevel(percent) {
+            micLevelFillEl.style.width = `${percent}%`;
+            micLevelValueEl.textContent = `${percent}%`;
+        }
+
+        function getResultReasonName(reason) {
+            if (reason === undefined || reason === null) {
+                return "unknown";
+            }
+
+            const mapped = speechSdk?.ResultReason?.[reason];
+            if (typeof mapped === "string" && mapped.trim()) {
+                return mapped;
+            }
+
+            return String(reason);
+        }
+
+        function extractResultTranslations(result) {
+            const translations = {};
+            const source = result?.translations;
+            if (!source) {
+                return translations;
+            }
+
+            const add = (language, value) => {
+                const lang = (language || "").trim().toLowerCase();
+                const text = (value || "").trim();
+                if (!lang || !text) {
+                    return;
+                }
+                translations[lang] = text;
+            };
+
+            const languages = Array.isArray(source.languages) ? source.languages : [];
+            if (languages.length > 0 && typeof source.get === "function") {
+                for (const language of languages) {
+                    add(language, source.get(language));
+                }
+            }
+
+            if (Object.keys(translations).length === 0) {
+                for (const language of supportedTargetLanguages) {
+                    if (typeof source.get === "function") {
+                        add(language, source.get(language));
+                    }
+                    add(language, source[language]);
+                    add(language, source[language.toUpperCase()]);
+                }
+            }
+
+            return translations;
+        }
+
+        function getSpeechServiceResultJson(result) {
+            const propertyId = speechSdk?.PropertyId?.SpeechServiceResponse_JsonResult;
+            if (!propertyId || !result?.properties?.getProperty) {
+                return null;
+            }
+
+            const raw = result.properties.getProperty(propertyId);
+            if (!raw) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return null;
+            }
+        }
+
+        async function ensureIdleMicMeterStarted() {
+            if (disableMicMeterCaptureForTesting ||
+                micMeterStartInProgress ||
+                browserRecognizer ||
+                micMeterAnalyser)
+            {
+                return;
+            }
+
+            micMeterStartInProgress = true;
+            try {
+                await startMicLevelMeter(getSelectedMicDeviceId());
+            } finally {
+                micMeterStartInProgress = false;
+            }
+        }
+
+        function extractFallbackFromSpeechServiceJson(json, sourceText, translations) {
+            const nextSourceText = sourceText || "";
+            const nextTranslations = { ...(translations || {}) };
+            if (!json || typeof json !== "object") {
+                return { sourceText: nextSourceText, translations: nextTranslations };
+            }
+
+            const getString = value => typeof value === "string" ? value.trim() : "";
+            const recognitionStatus = getString(json.RecognitionStatus).toLowerCase();
+            const normalizeTextValue = value => {
+                const text = getString(value);
+                if (!text) {
+                    return "";
+                }
+
+                const lowered = text.toLowerCase();
+                if ((recognitionStatus && lowered === recognitionStatus) ||
+                    lowered === "success" ||
+                    lowered === "nomatch" ||
+                    lowered === "initialsilencetimeout")
+                {
+                    return "";
+                }
+
+                return text;
+            };
+            const extractTextCandidate = value => {
+                if (typeof value === "string") {
+                    return normalizeTextValue(value);
+                }
+
+                if (Array.isArray(value)) {
+                    for (const item of value) {
+                        const candidate = extractTextCandidate(item);
+                        if (candidate) {
+                            return candidate;
+                        }
+                    }
+
+                    return "";
+                }
+
+                if (!value || typeof value !== "object") {
+                    return "";
+                }
+
+                return (
+                    normalizeTextValue(value.DisplayText) ||
+                    normalizeTextValue(value.displayText) ||
+                    normalizeTextValue(value.Text) ||
+                    normalizeTextValue(value.text) ||
+                    normalizeTextValue(value.Translation) ||
+                    normalizeTextValue(value.translation) ||
+                    normalizeTextValue(value.TranslatedText) ||
+                    normalizeTextValue(value.translatedText) ||
+                    "");
+            };
+            const isLanguageKey = key => /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test((key || "").trim());
+            const addTranslation = (language, value) => {
+                const lang = (language || "").trim().toLowerCase();
+                const text = extractTextCandidate(value);
+                if (!lang || !text || nextTranslations[lang]) {
+                    return;
+                }
+                nextTranslations[lang] = text;
+            };
+            const addTranslationsFromObject = objectValue => {
+                if (!objectValue || typeof objectValue !== "object") {
+                    return;
+                }
+
+                for (const [language, value] of Object.entries(objectValue)) {
+                    if (!isLanguageKey(language)) {
+                        continue;
+                    }
+                    addTranslation(language, value);
+                }
+            };
+            const addTranslationsFromArray = (arrayValue, fallbackLanguages = []) => {
+                if (!Array.isArray(arrayValue)) {
+                    return;
+                }
+
+                for (let index = 0; index < arrayValue.length; index++) {
+                    const item = arrayValue[index];
+                    const fallbackLanguage = (fallbackLanguages[index] || "").trim().toLowerCase();
+                    if (typeof item === "string") {
+                        addTranslation(fallbackLanguage, item);
+                        continue;
+                    }
+
+                    if (!item || typeof item !== "object") {
+                        continue;
+                    }
+
+                    const language =
+                        item.Language || item.language ||
+                        item.TargetLanguage || item.targetLanguage ||
+                        item.To || item.to ||
+                        item.Key || item.key ||
+                        fallbackLanguage;
+                    const text =
+                        item.DisplayText || item.displayText ||
+                        item.Text || item.text ||
+                        item.Translation || item.translation ||
+                        item.TranslatedText || item.translatedText ||
+                        item.Value || item.value ||
+                        item;
+                    addTranslation(language, text);
+                }
+            };
+            const addTranslationsFromIndexedObject = (objectValue, fallbackLanguages = []) => {
+                if (!objectValue || typeof objectValue !== "object" || Array.isArray(objectValue)) {
+                    return;
+                }
+
+                const numericEntries = Object.entries(objectValue)
+                    .filter(([key]) => /^\d+$/.test((key || "").trim()))
+                    .sort((a, b) => Number(a[0]) - Number(b[0]));
+                if (numericEntries.length === 0) {
+                    return;
+                }
+
+                for (const [key, value] of numericEntries) {
+                    const index = Number(key);
+                    const fallbackLanguage = (fallbackLanguages[index] || "").trim().toLowerCase();
+                    const language =
+                        value?.Language || value?.language ||
+                        value?.TargetLanguage || value?.targetLanguage ||
+                        value?.To || value?.to ||
+                        value?.Key || value?.key ||
+                        fallbackLanguage;
+                    addTranslation(language, value);
+                }
+            };
+
+            let fallbackSourceText = nextSourceText;
+            if (!fallbackSourceText) {
+                fallbackSourceText =
+                    normalizeTextValue(json.DisplayText) ||
+                    normalizeTextValue(json?.NBest?.[0]?.Display) ||
+                    normalizeTextValue(json?.NBest?.[0]?.Lexical);
+            }
+
+            const serviceTranslations = json.Translations;
+            addTranslationsFromObject(serviceTranslations);
+            addTranslationsFromArray(serviceTranslations, currentRequestedTargetLanguages);
+            addTranslationsFromIndexedObject(serviceTranslations, currentRequestedTargetLanguages);
+
+            const serviceTranslation = json.Translation;
+            if (typeof serviceTranslation === "string") {
+                const targetLanguage = (currentRoomTargetLanguage || "").trim().toLowerCase();
+                if (targetLanguage) {
+                    addTranslation(targetLanguage, serviceTranslation);
+                }
+            } else if (serviceTranslation && typeof serviceTranslation === "object") {
+                if (Array.isArray(serviceTranslation)) {
+                    addTranslationsFromArray(serviceTranslation, currentRequestedTargetLanguages);
+                }
+                addTranslationsFromObject(serviceTranslation.Translations);
+                addTranslationsFromArray(serviceTranslation.Translations, currentRequestedTargetLanguages);
+                addTranslationsFromIndexedObject(serviceTranslation.Translations, currentRequestedTargetLanguages);
+                addTranslation(
+                    serviceTranslation.Language || serviceTranslation.language,
+                    serviceTranslation.DisplayText || serviceTranslation.displayText || serviceTranslation.Text || serviceTranslation.text);
+                addTranslationsFromObject(serviceTranslation);
+            }
+
+            return { sourceText: fallbackSourceText, translations: nextTranslations };
+        }
+
+        function publishRecognitionResult(sourceLanguage, isFinal, result, extractedTranslations = null) {
+            if (!connection || !result) {
+                return;
+            }
+
+            const sourceText = (result.text || "").trim();
+            const translations = extractedTranslations || extractResultTranslations(result);
+            const serviceJson = getSpeechServiceResultJson(result);
+            const payload = extractFallbackFromSpeechServiceJson(serviceJson, sourceText, translations);
+            const resolvedSourceText = payload.sourceText;
+            const resolvedTranslations = payload.translations;
+
+            if (!resolvedSourceText && Object.keys(resolvedTranslations).length === 0) {
+                return;
+            }
+
+            publishAttemptCount += 1;
+            if (isFinal || Date.now() - lastPublishDebugAt > 5000) {
+                lastPublishDebugAt = Date.now();
+                addDebugLine(
+                    `publish attempt#${publishAttemptCount} final=${isFinal} sourceChars=${resolvedSourceText.length} keys=${Object.keys(resolvedTranslations).join(",") || "-"}`);
+            }
+
+            connection.invoke("PublishClientTranslation", {
+                sourceText: resolvedSourceText,
+                sourceLanguage,
+                isFinal,
+                translations: resolvedTranslations
+            }).then(() => {
+                publishSuccessCount += 1;
+                if (isFinal) {
+                    addDebugLine(`publish success final total=${publishSuccessCount}/${publishAttemptCount}`);
+                }
+            }).catch(err => {
+                publishFailureCount += 1;
+                // Keep translating even on transient publish failures.
+                if (Date.now() - lastPublishErrorAt > 5000) {
+                    lastPublishErrorAt = Date.now();
+                    addLine(`[error] Live publish failed: ${err?.message || err}`, true);
+                }
+                addDebugLine(
+                    `publish failed totalFailures=${publishFailureCount} msg=${err?.message || err}`,
+                    "error");
+            });
+        }
+
+        async function startRoom(roomId) {
+            if (startRoomInProgress) {
+                addDebugLine(`start room ignored (in progress) room=${roomId}`, "warn");
+                return;
+            }
+
+            if (browserRecognizer && browserRecognizerRoomId === roomId && currentRoomIsRunning) {
+                addLine("[system] Room is already running.", true);
+                addDebugLine(`start room ignored (already running) room=${roomId}`, "warn");
+                return;
+            }
+
+            startRoomInProgress = true;
+            try {
+                if (roomId !== currentRoomId) {
+                    await switchRoom(roomId);
+                }
+
+                if (document.hidden) {
+                    throw new Error("Control tab must stay visible when starting microphone capture.");
+                }
+
+                await ensureMicrophonePermission();
+                sourceLanguageAutoFallbackUsed = false;
+                const selectedDeviceForStart = useSystemDefaultMicForTranslation
+                    ? ""
+                    : resolveDefaultAliasMicDeviceId();
+                await runMicSignalPreflight(selectedDeviceForStart);
+
+                if (currentRoomIsRunning) {
+                    await attachMicrophoneToRunningRoom(roomId);
+                    return;
+                }
+
+                const payload = {
+                    sourceLanguage: sourceLanguageEl.value
+                };
+
+                const response = await fetchJson(`${roomApiBase(roomId)}/session/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    addDebugLine(`room start failed room=${roomId} msg=${response.errorMessage}`, "error");
+                    throw new Error(response.errorMessage);
+                }
+                addDebugLine(`room start ok room=${roomId} source=${payload.sourceLanguage}`);
+
+                if (roomId === currentRoomId) {
+                    updateStatus(response.data);
+                } else {
+                    await refreshStatusSafe();
+                }
+
+                try {
+                    await startBrowserRecognition(roomId, sourceLanguageEl.value);
+                } catch (err) {
+                    await stopRoom(roomId, "recognizer-start-failed");
+                    await refreshStatusSafe();
+                    await refreshRoomsSafe();
+                    throw err;
+                }
+
+                await refreshRoomsSafe();
+                addLine(`[system] Room ${roomId} started.`, true);
+            } finally {
+                startRoomInProgress = false;
+            }
+        }
+
+        async function attachMicrophoneToRunningRoom(roomId) {
+            if (!roomId) {
+                throw new Error("No room selected.");
+            }
+
+            if (!currentRoomIsRunning) {
+                throw new Error("Room is not running.");
+            }
+
+            if (browserRecognizer && browserRecognizerRoomId === roomId) {
+                addLine("[system] Microphone is already attached to this room.", true);
+                return;
+            }
+
+            if (document.hidden) {
+                throw new Error("Control tab must stay visible while attaching microphone.");
+            }
+
+            await ensureMicrophonePermission();
+            const sourceLanguage = currentRoomSourceLanguage || sourceLanguageEl.value;
+            addLine(`[system] Attaching microphone to running room ${roomId}...`, true);
+            await startBrowserRecognition(roomId, sourceLanguage);
+            await refreshStatusSafe();
+            addLine(`[system] Microphone attached to room ${roomId}.`, true);
+        }
+
+        async function stopRoom(roomId, reason = "manual") {
+            if (browserRecognizerRoomId === roomId) {
+                await stopBrowserRecognition();
+            } else {
+                stopMicLevelMeter();
+            }
+
+            const reasonParam = encodeURIComponent((reason || "manual").trim());
+            const response = await fetchJson(`${roomApiBase(roomId)}/session/stop?reason=${reasonParam}`, {
+                method: "POST"
+            });
+            if (!response.ok) {
+                addDebugLine(`room stop failed room=${roomId} reason=${reason} msg=${response.errorMessage}`, "error");
+                throw new Error(response.errorMessage);
+            }
+            addDebugLine(`room stop ok room=${roomId} reason=${reason}`);
+
+            if (roomId === currentRoomId) {
+                updateStatus(response.data);
+            } else {
+                await refreshStatusSafe();
+            }
+
+            await refreshRoomsSafe();
+            addLine(`[system] Room ${roomId} stopped (${reason}).`, true);
+        }
+
+        async function connectToRoom(roomId) {
+            if (connection) {
+                try {
+                    await connection.stop();
+                } catch {
+                    // Ignore connection stop errors.
+                }
+            }
+
+            const nextConnection = new signalRClient.HubConnectionBuilder()
+                .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
+                    transport: signalRClient.HttpTransportType.LongPolling
+                })
+                .withAutomaticReconnect()
+                .build();
+
+            nextConnection.on("translationUpdate", data => {
+                if (data.systemMessage) {
+                    addLine(`[system] ${data.systemMessage}`, true);
+                    refreshStatusSafe();
+                    refreshRoomsSafe();
+                    return;
+                }
+
+                const liveText = data.translatedText || data.sourceText;
+                if (!liveText) {
+                    return;
+                }
+
+                const marker = data.isFinal ? "final" : "partial";
+                addLine(`[${marker}] ${liveText}`);
+            });
+
+            nextConnection.onreconnecting(() => {
+                addLine("[system] Reconnecting live feed...", true);
+            });
+
+            nextConnection.onreconnected(() => {
+                addLine("[system] Live feed reconnected.", true);
+            });
+
+            nextConnection.onclose(err => {
+                const message = err?.message || "Connection closed.";
+                addLine(`[error] Live feed disconnected: ${message}`, true);
+            });
+
+            await nextConnection.start();
+            addDebugLine(`signalr connected room=${roomId} transport=LongPolling state=${nextConnection.state}`);
+            connection = nextConnection;
+        }
+
+        async function switchRoom(roomId) {
+            if (browserRecognizerRoomId && browserRecognizerRoomId !== roomId) {
+                await stopRoom(browserRecognizerRoomId, "switch-room");
+            }
+
+            currentRoomId = roomId;
+            lastRoomDiagStateSignature = "";
+            setRoomIdInQuery(roomId);
+            await connectToRoom(roomId);
+            await refreshAccessInfo();
+            await refreshStatus();
+            await refreshRoomsSafe();
+            await refreshRoomDiagnosticsSafe();
+        }
+
+        async function ensureRoom() {
+            const requestedRoomId = getRoomIdFromQuery();
+            if (requestedRoomId) {
+                try {
+                    await switchRoom(requestedRoomId);
+                    return;
+                } catch {
+                    addLine(`[system] Room ${requestedRoomId} not found. Creating a new room.`, true);
+                }
+            }
+
+            const room = await createRoom();
+            await switchRoom((room?.roomId || "").toUpperCase());
+        }
+
+        function openDisplay(roomId = currentRoomId) {
+            if (!roomId) {
+                throw new Error("No room selected.");
+            }
+
+            window.open(`/join.html?roomId=${encodeURIComponent(roomId)}`, "_blank");
+            addLine("[system] Display opened. Keep this control tab in foreground while speaking.", true);
+            addDebugLine("open display requested");
+        }
+
+        function startStatusPolling(intervalMs) {
+            if (statusPollHandle !== null) {
+                clearInterval(statusPollHandle);
+            }
+
+            statusPollIntervalMs = intervalMs;
+            if (!intervalMs || intervalMs <= 0) {
+                statusPollHandle = null;
+                return;
+            }
+
+            statusPollHandle = setInterval(async () => {
+                await refreshStatusSafe();
+            }, intervalMs);
+        }
+
+        function startRoomPolling(intervalMs) {
+            if (roomPollHandle !== null) {
+                clearInterval(roomPollHandle);
+            }
+
+            roomPollIntervalMs = intervalMs;
+            if (!intervalMs || intervalMs <= 0) {
+                roomPollHandle = null;
+                return;
+            }
+
+            roomPollHandle = setInterval(async () => {
+                await refreshRoomsSafe();
+            }, intervalMs);
+        }
+
+        async function refreshStatusSafe() {
+            try {
+                await refreshStatus();
+            } catch (err) {
+                if (isRoomNotFoundError(err?.message)) {
+                    await recoverFromMissingRoom("Current room no longer exists.");
+                    return;
+                }
+
+                // Ignore transient poll errors and keep trying.
+            }
+        }
+
+        async function refreshRoomsSafe() {
+            try {
+                await refreshRooms();
+            } catch {
+                // Ignore transient poll errors and keep trying.
+            }
+        }
+
+        async function refreshDiagnostics() {
+            const response = await fetchJson("/api/diag");
+            if (!response.ok || !response.data) {
+                throw new Error(response.errorMessage || "Diagnostics unavailable.");
+            }
+
+            const diag = response.data;
+            const roomSummary =
+                `active=${diag.runningRoomsCount ?? "?"}, retained=${diag.retainedRoomsCount ?? 0}`;
+            const version = diag.version || "n/a";
+            addLine(`[system] diag: env=${diag.environment || "?"}, version=${version}, ${roomSummary}`, true);
+        }
+
+        async function refreshDiagnosticsSafe() {
+            try {
+                await refreshDiagnostics();
+            } catch {
+                // Ignore diagnostic poll errors.
+            }
+        }
+
+        async function refreshRoomDiagnostics() {
+            const response = await fetchJson(`${roomApiBase()}/diag`);
+            if (!response.ok || !response.data) {
+                throw new Error(response.errorMessage || "Room diagnostics unavailable.");
+            }
+
+            const diag = response.data;
+            const publishAgeMs = diag.lastClientPublishAtUtc
+                ? Date.now() - Date.parse(diag.lastClientPublishAtUtc)
+                : null;
+            if (Date.now() - lastRoomDiagDebugAt > 10000) {
+                lastRoomDiagDebugAt = Date.now();
+                addDebugLine(
+                    `roomdiag running=${diag.isRunning} hubClients=${diag.activeHubConnections ?? 0} lastPublish=${diag.lastClientPublishAtUtc || "none"} stopReason=${diag.lastStopReason || "-"}`);
+            }
+
+            const signature = [
+                diag.isRunning ? "running" : "stopped",
+                diag.lastStopReason || "",
+                diag.lastClientPublishAtUtc || "",
+                diag.activeHubConnections ?? 0
+            ].join("|");
+
+            if (signature !== lastRoomDiagStateSignature) {
+                lastRoomDiagStateSignature = signature;
+                if (!diag.isRunning && diag.lastStopReason) {
+                    addLine(`[system] Room stop reason: ${diag.lastStopReason}`, true);
+                }
+            }
+
+            if (diag.isRunning && (publishAgeMs === null || publishAgeMs > 15000)) {
+                const now = Date.now();
+                if (now - lastRoomDiagWarningAt > 15000) {
+                    lastRoomDiagWarningAt = now;
+                    addLine(
+                        `[error] No captions published recently while room is running (clients=${diag.activeHubConnections ?? 0}).`,
+                        true);
+                }
+            }
+        }
+
+        async function refreshRoomDiagnosticsSafe() {
+            try {
+                await refreshRoomDiagnostics();
+            } catch {
+                // Ignore transient room diagnostic errors.
+            }
+        }
+
+        function startRoomDiagnosticsPolling(intervalMs) {
+            if (roomDiagPollHandle !== null) {
+                clearInterval(roomDiagPollHandle);
+            }
+
+            roomDiagPollIntervalMs = intervalMs;
+            if (!intervalMs || intervalMs <= 0) {
+                roomDiagPollHandle = null;
+                return;
+            }
+
+            roomDiagPollHandle = setInterval(async () => {
+                await refreshRoomDiagnosticsSafe();
+            }, intervalMs);
+        }
+
+        function startDiagnosticsPolling(intervalMs) {
+            if (diagPollHandle !== null) {
+                clearInterval(diagPollHandle);
+            }
+
+            diagPollIntervalMs = intervalMs;
+            if (!intervalMs || intervalMs <= 0) {
+                diagPollHandle = null;
+                return;
+            }
+
+            diagPollHandle = setInterval(async () => {
+                await refreshDiagnosticsSafe();
+            }, intervalMs);
+        }
+
+        function getPollingSchedule() {
+            const isActive = currentRoomIsRunning || Boolean(browserRecognizer);
+            const isHidden = document.hidden;
+
+            return {
+                statusMs: isActive ? 5000 : (isHidden ? 30000 : 12000),
+                roomsMs: isActive ? 7000 : (isHidden ? 45000 : 18000),
+                roomDiagMs: isActive ? 7000 : 0,
+                diagMs: isHidden ? 120000 : 60000
+            };
+        }
+
+        function applyPollingSchedule() {
+            const schedule = getPollingSchedule();
+
+            if (statusPollIntervalMs !== schedule.statusMs) {
+                startStatusPolling(schedule.statusMs);
+            }
+
+            if (roomPollIntervalMs !== schedule.roomsMs) {
+                startRoomPolling(schedule.roomsMs);
+            }
+
+            if (roomDiagPollIntervalMs !== schedule.roomDiagMs) {
+                startRoomDiagnosticsPolling(schedule.roomDiagMs);
+            }
+
+            if (diagPollIntervalMs !== schedule.diagMs) {
+                startDiagnosticsPolling(schedule.diagMs);
+            }
+        }
+
+        async function sendTestCaption() {
+            const testText = `Caption test ${new Date().toLocaleTimeString()}`;
+            const response = await fetchJson(`${roomApiBase()}/debug/test-caption`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: testText })
+            });
+
+            if (!response.ok) {
+                throw new Error(response.errorMessage);
+            }
+
+            addLine(`[system] Test caption sent: ${testText}`, true);
+        }
+
+        function isRoomNotFoundError(message) {
+            return (message || "").toLowerCase().includes("not found");
+        }
+
+        async function recoverFromMissingRoom(reason) {
+            if (roomRecoveryInProgress) {
+                return;
+            }
+
+            roomRecoveryInProgress = true;
+            try {
+                addLine(`[system] ${reason} Creating a new room.`, true);
+                const room = await createRoom();
+                await switchRoom((room?.roomId || "").toUpperCase());
+            } catch (err) {
+                addLine(`[error] ${err.message || "Unable to recover from missing room."}`, true);
+            } finally {
+                roomRecoveryInProgress = false;
+            }
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options || {});
+            const raw = await response.text();
+
+            let data = null;
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = null;
+                }
+            }
+
+            let errorMessage = `Request failed (${response.status}).`;
+            if (data && data.error) {
+                errorMessage = data.error;
+            } else if (raw) {
+                errorMessage = raw;
+            }
+
+            return {
+                ok: response.ok,
+                data,
+                errorMessage
+            };
+        }
+
+        async function init() {
+            addDebugLine(`init secure=${window.isSecureContext} hidden=${document.hidden} online=${navigator.onLine}`);
+            addDebugLine(`ua=${navigator.userAgent}`);
+            attachMicBtn.style.display = "none";
+            if (useSystemDefaultMicForTranslation) {
+                addLine("[system] Translation capture is locked to system default microphone for stability.", true);
+            }
+            if (disableMicMeterCaptureForTesting) {
+                addLine("[system] Mic level meter capture is disabled for translation testing.", true);
+            }
+            if (navigator.permissions?.query) {
+                try {
+                    const micPermission = await navigator.permissions.query({ name: "microphone" });
+                    addDebugLine(`permission microphone=${micPermission.state}`);
+                } catch {
+                    addDebugLine("permission microphone query unavailable", "warn");
+                }
+            }
+
+            try {
+                await refreshMicrophoneDevices(true);
+                addDebugLine(`mic devices loaded selected="${getSelectedMicLabel()}" id="${getSelectedMicDeviceId() || "default"}"`);
+            } catch (err) {
+                addLine(`[error] Mic device list unavailable: ${err?.message || err}`, true);
+                addDebugLine(`mic device load failed: ${err?.message || err}`, "error");
+            }
+            await ensureRoom();
+            await refreshRoomsSafe();
+            await refreshDiagnosticsSafe();
+            await refreshRoomDiagnosticsSafe();
+            await ensureIdleMicMeterStarted();
+            applyPollingSchedule();
+        }
+
+        init().catch(err => addLine(`[error] ${err.message}`, true));
+    </script>
+</body>
+</html>
