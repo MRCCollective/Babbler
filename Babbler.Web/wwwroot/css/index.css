@@ -37,6 +37,14 @@ body {
     padding: 1rem;
 }
 
+.collapsible-panel.collapsed {
+    padding-bottom: 0.7rem;
+}
+
+.collapsible-panel.collapsed .panel-content {
+    display: none;
+}
+
 h1 {
     margin: 0 0 0.4rem 0;
 }
@@ -44,6 +52,33 @@ h1 {
 .muted {
     color: var(--muted);
     margin: 0;
+}
+
+.info-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.copy-icon-btn {
+    width: auto;
+    min-width: 2rem;
+    padding: 0.32rem 0.45rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.copy-icon-btn svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: currentColor;
+}
+
+#joinUrlValue {
+    word-break: break-all;
 }
 
 .controls {
@@ -102,10 +137,6 @@ button:disabled {
     word-break: break-word;
 }
 
-.partial.translation {
-    color: #c8ffd8;
-}
-
 #transcript {
     height: 320px;
     overflow: auto;
@@ -138,4 +169,103 @@ button:disabled {
     color: #d4e7f8;
     text-decoration: none;
     font-size: 0.88rem;
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.55rem;
+}
+
+.panel-head label {
+    margin: 0;
+}
+
+.panel-btn {
+    width: auto;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.86rem;
+}
+
+.panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.inline-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.inline-toggle input {
+    width: auto;
+    margin: 0;
+}
+
+.source-log {
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    border-radius: 10px;
+    border: 1px solid rgba(238, 244, 251, 0.18);
+    background: #06101b;
+    color: #d6e5f5;
+    padding: 0.75rem;
+    font-family: Consolas, monospace;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.rooms-list {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.room-item {
+    border: 1px solid rgba(238, 244, 251, 0.14);
+    border-radius: 10px;
+    padding: 0.65rem;
+    background: rgba(6, 16, 27, 0.55);
+}
+
+.room-item.current {
+    border-color: rgba(255, 123, 41, 0.6);
+}
+
+.room-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.room-id {
+    font-family: Consolas, monospace;
+    letter-spacing: 0.08em;
+    color: #ffd2a7;
+    font-weight: 700;
+}
+
+.room-meta {
+    color: var(--muted);
+    font-size: 0.84rem;
+    margin-top: 0.35rem;
+}
+
+.room-actions {
+    margin-top: 0.5rem;
+}
+
+.room-actions button {
+    width: auto;
 }

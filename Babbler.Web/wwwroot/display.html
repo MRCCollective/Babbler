@@ -141,6 +141,8 @@
 
     <script src="/lib/signalr/signalr.min.js"></script>
     <script>
+        const SUPPORTED_TARGET_LANGUAGES = ["en", "sv", "es", "fr", "de", "it", "ja"];
+        const TARGET_LANGUAGE_STORAGE_KEY = "babbler_display_target_language";
         const SUBTITLE_CLEAR_IDLE_MS = 2200;
         const SUBTITLE_FADE_DURATION_MS = 170;
         const subtitleEl = document.getElementById("subtitle");
@@ -163,6 +165,8 @@
             throw new Error("SignalR client failed to load.");
         }
 
+        targetLanguageEl.value = getInitialTargetLanguage();
+
         const connection = new signalRClient.HubConnectionBuilder()
             .withUrl(`/hubs/translation?roomId=${encodeURIComponent(roomId)}`, {
                 transport: signalRClient.HttpTransportType.LongPolling
@@ -178,21 +182,14 @@
                 return;
             }
 
-            const liveText = data.translatedText || data.sourceText;
+            const liveText = pickDisplayText(data, targetLanguageEl.value);
             if (!liveText) {
                 return;
             }
 
             showSubtitle(liveText);
-            if (data.targetLanguage) {
-                langsEl.textContent = `Room: ${roomId} | Target: ${data.targetLanguage}`;
-                if (targetLanguageEl.value !== data.targetLanguage) {
-                    targetLanguageEl.value = data.targetLanguage;
-                }
-            } else {
-                langsEl.textContent = `Room: ${roomId}`;
-            }
-            timeEl.textContent = new Date(data.timestampUtc).toLocaleTimeString();
+            updateFooterLanguages(data);
+            timeEl.textContent = new Date(data.timestampUtc || Date.now()).toLocaleTimeString();
         });
 
         connection.onreconnecting(() => {
@@ -210,23 +207,11 @@
             subtitleEl.textContent = "Disconnected. Please refresh.";
         });
 
-        targetLanguageEl.addEventListener("change", async () => {
-            try {
-                const response = await fetchJson(`${roomApiBase()}/session/target`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ targetLanguage: targetLanguageEl.value })
-                });
-
-                if (!response.ok) {
-                    throw new Error(response.errorMessage);
-                }
-
-                applyStatus(response.data);
-            } catch (err) {
-                console.error(`Unable to change target language: ${err.message || err}`);
-                await refreshStatus();
-            }
+        targetLanguageEl.addEventListener("change", () => {
+            const nextValue = normalizeTargetLanguage(targetLanguageEl.value);
+            targetLanguageEl.value = nextValue;
+            localStorage.setItem(TARGET_LANGUAGE_STORAGE_KEY, nextValue);
+            updateFooterLanguages();
         });
 
         function showSubtitle(text) {
@@ -272,15 +257,7 @@
                 return;
             }
 
-            if (state.targetLanguage) {
-                if (targetLanguageEl.value !== state.targetLanguage) {
-                    targetLanguageEl.value = state.targetLanguage;
-                }
-                langsEl.textContent = `Room: ${roomId} | Target: ${state.targetLanguage}`;
-                return;
-            }
-
-            langsEl.textContent = `Room: ${roomId}`;
+            updateFooterLanguages({ sourceLanguage: state.sourceLanguage });
         }
 
         async function refreshStatus() {
@@ -328,9 +305,75 @@
             return (params.get("roomId") || "").replace(/[^a-z0-9]/gi, "").toUpperCase().trim();
         }
 
+        function getInitialTargetLanguage() {
+            const stored = localStorage.getItem(TARGET_LANGUAGE_STORAGE_KEY);
+            return normalizeTargetLanguage(stored || targetLanguageEl.value || "en");
+        }
+
+        function normalizeTargetLanguage(value) {
+            const normalized = (value || "").trim().toLowerCase();
+            return SUPPORTED_TARGET_LANGUAGES.includes(normalized) ? normalized : "en";
+        }
+
+        function readTranslationValue(value) {
+            if (!value) {
+                return "";
+            }
+
+            if (typeof value === "string") {
+                return value.trim();
+            }
+
+            if (typeof value !== "object") {
+                return "";
+            }
+
+            return (
+                (value.DisplayText || "").trim() ||
+                (value.displayText || "").trim() ||
+                (value.Text || "").trim() ||
+                (value.text || "").trim() ||
+                ""
+            );
+        }
+
+        function pickDisplayText(data, targetLanguage) {
+            const normalizedTarget = normalizeTargetLanguage(targetLanguage);
+            const translations = data?.translations;
+
+            if (translations && typeof translations === "object") {
+                const direct = readTranslationValue(translations[normalizedTarget]);
+                if (direct) {
+                    return direct;
+                }
+
+                for (const [key, value] of Object.entries(translations)) {
+                    if ((key || "").trim().toLowerCase().startsWith(normalizedTarget)) {
+                        const text = readTranslationValue(value);
+                        if (text) {
+                            return text;
+                        }
+                    }
+                }
+            }
+
+            const translated = (data?.translatedText || "").trim();
+            if (translated) {
+                return translated;
+            }
+
+            return (data?.sourceText || "").trim();
+        }
+
+        function updateFooterLanguages(data) {
+            const sourceLanguage = (data?.sourceLanguage || "").trim() || "-";
+            const targetLanguage = normalizeTargetLanguage(targetLanguageEl.value);
+            langsEl.textContent = `Room: ${roomId} | ${sourceLanguage} -> ${targetLanguage}`;
+        }
+
         async function init() {
             await connection.start();
-            langsEl.textContent = `Room: ${roomId}`;
+            updateFooterLanguages();
             await refreshStatus();
         }
 

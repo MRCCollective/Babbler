@@ -3,6 +3,7 @@ using Babbler.Web.Options;
 using Babbler.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.Configure<SpeechOptions>(
     builder.Configuration.GetSection(SpeechOptions.SectionName));
@@ -28,11 +29,14 @@ app.Use(async (context, next) =>
             return;
         }
 
-        var session = context.RequestServices.GetRequiredService<TranslationSessionService>();
-        if (!session.HasDisplayAccess(roomId, context))
+        if (!IsLocalDevBypass(context, app.Environment))
         {
-            context.Response.Redirect($"/join.html?roomId={Uri.EscapeDataString(roomId)}");
-            return;
+            var session = context.RequestServices.GetRequiredService<TranslationSessionService>();
+            if (!session.HasDisplayAccess(roomId, context))
+            {
+                context.Response.Redirect($"/join.html?roomId={Uri.EscapeDataString(roomId)}");
+                return;
+            }
         }
     }
 
@@ -296,6 +300,19 @@ static IResult ToRoomError(InvalidOperationException exception)
     }
 
     return Results.BadRequest(new { error = exception.Message });
+}
+
+static bool IsLocalDevBypass(HttpContext httpContext, IHostEnvironment environment)
+{
+    if (!environment.IsDevelopment())
+    {
+        return false;
+    }
+
+    var host = httpContext.Request.Host.Host;
+    return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+           host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+           host.Equals("::1", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed record VerifyPinRequest(string Pin);

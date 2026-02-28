@@ -194,7 +194,8 @@ public sealed class TranslationSessionService : IAsyncDisposable
 
             var sourceText = payload.SourceText?.Trim();
             var targetLanguage = NormalizeTargetLanguage(room.TargetLanguage);
-            var translatedText = GetTranslatedTextForTarget(payload.Translations, targetLanguage);
+            var translations = NormalizeTranslations(payload.Translations);
+            var translatedText = GetTranslatedTextForTarget(translations, targetLanguage);
             if (string.IsNullOrWhiteSpace(translatedText) &&
                 !string.IsNullOrWhiteSpace(sourceText))
             {
@@ -202,7 +203,9 @@ public sealed class TranslationSessionService : IAsyncDisposable
                 translatedText = sourceText;
             }
 
-            if (string.IsNullOrWhiteSpace(sourceText) && string.IsNullOrWhiteSpace(translatedText))
+            if (string.IsNullOrWhiteSpace(sourceText) &&
+                string.IsNullOrWhiteSpace(translatedText) &&
+                (translations is null || translations.Count == 0))
             {
                 return;
             }
@@ -212,6 +215,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
                 string.IsNullOrWhiteSpace(translatedText) ? null : translatedText,
                 payload.SourceLanguage ?? room.SourceLanguage,
                 targetLanguage,
+                translations,
                 payload.IsFinal,
                 DateTimeOffset.UtcNow,
                 null);
@@ -338,6 +342,10 @@ public sealed class TranslationSessionService : IAsyncDisposable
                 safeText,
                 sourceLanguage,
                 targetLanguage,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [targetLanguage] = safeText
+                },
                 true,
                 now,
                 null);
@@ -683,6 +691,30 @@ public sealed class TranslationSessionService : IAsyncDisposable
         return null;
     }
 
+    private static IReadOnlyDictionary<string, string>? NormalizeTranslations(
+        IReadOnlyDictionary<string, string>? translations)
+    {
+        if (translations is null || translations.Count == 0)
+        {
+            return null;
+        }
+
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in translations)
+        {
+            var key = pair.Key?.Trim();
+            var value = pair.Value?.Trim();
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            normalized[key] = value;
+        }
+
+        return normalized.Count == 0 ? null : normalized;
+    }
+
     private static string NormalizeTargetLanguage(string? targetLanguage)
     {
         if (!string.IsNullOrWhiteSpace(targetLanguage))
@@ -889,6 +921,7 @@ public sealed class TranslationSessionService : IAsyncDisposable
             null,
             room?.SourceLanguage,
             room?.TargetLanguage,
+            null,
             true,
             DateTimeOffset.UtcNow,
             message);

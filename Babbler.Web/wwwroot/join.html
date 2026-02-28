@@ -122,8 +122,12 @@
         const roomIdEl = document.getElementById("roomId");
         const pinEl = document.getElementById("pin");
         const errorEl = document.getElementById("error");
+        const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 
         roomIdEl.value = getRoomIdFromQuery();
+        if (isLocalHost && roomIdEl.value) {
+            window.location.replace(`/display.html?roomId=${encodeURIComponent(roomIdEl.value)}`);
+        }
 
         formEl.addEventListener("submit", async event => {
             event.preventDefault();

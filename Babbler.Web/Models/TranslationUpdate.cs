@@ -5,6 +5,7 @@ public sealed record TranslationUpdate(
     string? TranslatedText,
     string? SourceLanguage,
     string? TargetLanguage,
+    IReadOnlyDictionary<string, string>? Translations,
     bool IsFinal,
     DateTimeOffset TimestampUtc,
     string? SystemMessage);
