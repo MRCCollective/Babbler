@@ -1,9 +1,13 @@
 using Babbler.Web.Hubs;
 using Babbler.Web.Options;
 using Babbler.Web.Services;
+using System.Security.Cryptography;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+const string AccessGateUsername = "daniel@mrccollective.se";
+const string AccessGatePassword = "a33oMoyZapNl7H";
 
 builder.Services.Configure<SpeechOptions>(
     builder.Configuration.GetSection(SpeechOptions.SectionName));
@@ -17,6 +21,21 @@ builder.Services.AddSingleton<IMonthlyUsageStore, BitStoreUsageStore>();
 builder.Services.AddSingleton<TranslationSessionService>();
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    if (TryReadBasicCredentials(context, out var username, out var password) &&
+        SecureEquals(username, AccessGateUsername) &&
+        SecureEquals(password, AccessGatePassword))
+    {
+        await next();
+        return;
+    }
+
+    context.Response.Headers.WWWAuthenticate = "Basic realm=\"Babbler\"";
+    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+    await context.Response.WriteAsync("Authentication required.");
+});
 
 app.Use(async (context, next) =>
 {
@@ -313,6 +332,58 @@ static bool IsLocalDevBypass(HttpContext httpContext, IHostEnvironment environme
     return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
            host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
            host.Equals("::1", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool TryReadBasicCredentials(HttpContext httpContext, out string username, out string password)
+{
+    username = string.Empty;
+    password = string.Empty;
+
+    var authorization = httpContext.Request.Headers.Authorization.ToString();
+    if (string.IsNullOrWhiteSpace(authorization) ||
+        !authorization.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    var encoded = authorization["Basic ".Length..].Trim();
+    if (string.IsNullOrWhiteSpace(encoded))
+    {
+        return false;
+    }
+
+    byte[] rawBytes;
+    try
+    {
+        rawBytes = Convert.FromBase64String(encoded);
+    }
+    catch
+    {
+        return false;
+    }
+
+    var decoded = Encoding.UTF8.GetString(rawBytes);
+    var separatorIndex = decoded.IndexOf(':');
+    if (separatorIndex <= 0)
+    {
+        return false;
+    }
+
+    username = decoded[..separatorIndex];
+    password = decoded[(separatorIndex + 1)..];
+    return !string.IsNullOrWhiteSpace(username);
+}
+
+static bool SecureEquals(string left, string right)
+{
+    var leftBytes = Encoding.UTF8.GetBytes(left);
+    var rightBytes = Encoding.UTF8.GetBytes(right);
+    if (leftBytes.Length != rightBytes.Length)
+    {
+        return false;
+    }
+
+    return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
 }
 
 internal sealed record VerifyPinRequest(string Pin);
